@@ -55,6 +55,9 @@ const char* get_shortcut(XMLElement* elem)
 #elif defined __APPLE__
   if (!shortcut)
     shortcut = elem->Attribute("mac");
+#elif LAF_ANDROID
+  if (!shortcut)
+    shortcut = elem->Attribute("android");
 #else
   if (!shortcut)
     shortcut = elem->Attribute("linux");

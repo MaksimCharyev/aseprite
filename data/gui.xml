@@ -31,7 +31,7 @@
       <key command="ExportSpriteSheet" shortcut="Ctrl+E" mac="Cmd+E" />
       <key command="RepeatLastExport" shortcut="Ctrl+Shift+X" mac="Cmd+Shift+X" />
       <key command="AdvancedMode" shortcut="Ctrl+F" />
-      <key command="Exit" win="Ctrl+Q" linux="Ctrl+Q" mac="Cmd+Q" />
+      <key command="Exit" win="Ctrl+Q" linux="Ctrl+Q" mac="Cmd+Q" android="Ctrl+Q" />
       <key command="Exit" win="Alt+F4" />
       <key command="Cancel" shortcut="Esc">
         <param name="type" value="all" />
@@ -41,6 +41,10 @@
       <key command="Redo" shortcut="Ctrl+Y" mac="Cmd+Y" />
       <key command="Redo" shortcut="Ctrl+R" mac="Cmd+R" />
       <key command="Redo" shortcut="Ctrl+Shift+Z" mac="Cmd+Shift+Z" />
+      <!-- Touch/pen gestures (Android only, "android" attribute) -->
+      <key command="Undo" android="Two Finger Tap" />
+      <key command="Redo" android="Three Finger Tap" />
+      <key command="ToggleEraser" android="Pen Double Tap" />
       <key command="Cut" shortcut="Ctrl+X" mac="Cmd+X" />
       <key command="Cut" shortcut="Shift+Del" />
       <key command="Copy" shortcut="Ctrl+C" mac="Cmd+C" />

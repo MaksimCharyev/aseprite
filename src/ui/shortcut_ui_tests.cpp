@@ -57,3 +57,17 @@ TEST(Shortcut, ToString)
   EXPECT_EQ("+ Pad", Shortcut("Plus Pad").toString());
   EXPECT_EQ("+ Pad", Shortcut("+ Pad").toString());
 }
+
+TEST(Shortcut, GestureKeys)
+{
+  EXPECT_EQ(Shortcut(kKeyNoneModifier, kKeyPenDoubleTap, 0), Shortcut("Pen Double Tap"));
+  EXPECT_EQ(Shortcut(kKeyNoneModifier, kKeyTwoFingerTap, 0), Shortcut("Two Finger Tap"));
+  EXPECT_EQ(Shortcut(kKeyShiftModifier, kKeyThreeFingerTap, 0), Shortcut("Shift+Three Finger Tap"));
+
+  EXPECT_EQ("Pen Double Tap", Shortcut(kKeyNoneModifier, kKeyPenDoubleTap, 0).toString());
+  EXPECT_EQ("Two Finger Tap", Shortcut(kKeyNoneModifier, kKeyTwoFingerTap, 0).toString());
+  EXPECT_EQ("Three Finger Tap", Shortcut(kKeyNoneModifier, kKeyThreeFingerTap, 0).toString());
+
+  // The stroke cancel key is internal, it cannot be a shortcut.
+  EXPECT_TRUE(Shortcut(kKeyNoneModifier, kKeyPointerCancel, 0).toString().empty());
+}

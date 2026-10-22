@@ -140,6 +140,18 @@ const char* scancode_to_string[] = {
 };
 int scancode_to_string_size = sizeof(scancode_to_string) / sizeof(scancode_to_string[0]);
 
+// Virtual keys of touch/pen gestures (Android). kKeyPointerCancel
+// has no name: it's internal and cannot be used as a shortcut.
+const char* gesture_key_name(const KeyScancode scancode)
+{
+  switch (scancode) {
+    case kKeyPenDoubleTap:   return "Pen Double Tap";
+    case kKeyTwoFingerTap:   return "Two Finger Tap";
+    case kKeyThreeFingerTap: return "Three Finger Tap";
+    default:                 return nullptr;
+  }
+}
+
 } // anonymous namespace
 
 Shortcut::Shortcut()
@@ -273,6 +285,12 @@ Shortcut::Shortcut(const std::string& str)
       m_scancode = kKeyDelPad;
     else if (tok == "enter pad")
       m_scancode = kKeyEnterPad;
+    else if (tok == "pen double tap")
+      m_scancode = kKeyPenDoubleTap;
+    else if (tok == "two finger tap")
+      m_scancode = kKeyTwoFingerTap;
+    else if (tok == "three finger tap")
+      m_scancode = kKeyThreeFingerTap;
     else if (tok == "left mouse button")
       m_mouseButton = kButtonLeft;
     else if (tok == "right mouse button")
@@ -328,6 +346,9 @@ std::string Shortcut::toString() const
   else if (m_scancode > 0 && m_scancode < scancode_to_string_size &&
            scancode_to_string[m_scancode]) {
     buf += scancode_to_string[m_scancode];
+  }
+  else if (const char* name = gesture_key_name(m_scancode)) {
+    buf += name;
   }
   // Mouse button
   else if (m_mouseButton != kButtonNone) {

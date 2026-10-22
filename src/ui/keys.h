@@ -131,6 +131,11 @@ using os::kKeyUnknown5;
 using os::kKeyUnknown6;
 using os::kKeyUnknown7;
 using os::kKeyUnknown8;
+
+using os::kKeyPenDoubleTap;
+using os::kKeyPointerCancel;
+using os::kKeyThreeFingerTap;
+using os::kKeyTwoFingerTap;
 using os::kKeyUp;
 using os::kKeyV;
 using os::kKeyW;
