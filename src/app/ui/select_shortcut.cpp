@@ -181,7 +181,7 @@ void SelectShortcut::updateModifiers()
   win()->setVisible(false);
   cmd()->setSelected((m_shortcut.modifiers() & kKeyCmdModifier) == kKeyCmdModifier);
 #else
-  #if __linux__
+  #if LAF_LINUX || LAF_ANDROID
   win()->setText(kWinKeyName);
   m_tooltipManager.addTooltipFor(
     win(),
