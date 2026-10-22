@@ -1,6 +1,7 @@
 # ADR 0009: System file picker (SAF) — documents as cache files mapped to content URIs
 
-- Status: Accepted
+- Status: Accepted (Export amended by ADR 0010: on Android exports go to
+  Download/Aseprite through MediaStore, not through the picker)
 - Date: 2026-10-22
 - Owner: mobile-laf-backend (laf `os/android`, `dlgs`, Java), app hooks
   reviewed by mobile-touch-ux

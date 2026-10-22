@@ -345,8 +345,8 @@ default). Capture for every step:
    extension). Expected: the file in Files is `test2.aseprite`
    (`documents: renamed to "test2.aseprite"`), or, if the provider
    refuses the rename, `test2` with Aseprite data (report which).
-3. **Export PNG.** File > Export As > browse "…" → picker, type
-   `test.png`. Expected: `test.png` in Files, opens in Gallery.
+3. **Export PNG.** Replaced by the "Exports to Download/Aseprite"
+   section below (ADR 0010): Export As no longer uses the picker.
 4. **Save overwrites.** Draw more, Ctrl+S (or File > Save). Expected: no
    picker, `documents: saved … -> content://…` again; the file in Files
    has the new content (open it in the Gallery for a PNG, or re-open it
@@ -379,3 +379,48 @@ default). Capture for every step:
    (`input: text input off, hiding the soft keyboard`). Opening a
    dialog without tapping a field must **not** open the keyboard.
    Report if characters appear twice or Backspace deletes two.
+
+## Exports to Download/Aseprite (branch mobile/m3-export, laf mobile/laf-export, ADR 0010)
+
+Install `build/apk/aseprite-aseprite.apk` with `adb install -r`.
+Capture:
+
+    adb logcat -v time -s laf:V AndroidRuntime:E DEBUG:V libc:F
+
+1. **Export window.** Open/draw a sprite, File > Export As. Expected: the
+   "Output File" field has only a name (e.g. `Sprite-0001.png` or
+   `Sprite-0001.gif` for animations), no "…" button, and below it the
+   line `Saved to: Download/Aseprite/Sprite-0001.png`. Type another name
+   (e.g. `cat.png`): the line follows each keystroke. Typing `/` gives `_`.
+2. **Export PNG ×2, same name → one file replaced.** Name `test.png`,
+   100%, Export. Expected: tip `Exported to Download/Aseprite/test.png`;
+   logcat `downloads: published …/cache/downloads/Aseprite/test.png -> Download/Aseprite/test.png (new, content://media/…/downloads/<id>) in N ms`.
+   Draw something, Export again with the same name: no overwrite
+   alert, `(replaced, content://…/<same id>)`. In Files >
+   Download > Aseprite there is only `test.png` (no `test (1).png`) and
+   it shows the new drawing.
+3. **Scale 2x → bigger file.** Export As again: the window remembers
+   `test.png` and the other options. Set Resize 200%, Export. In Files
+   the image details show double width/height (and a bigger size).
+   Open Export As again: Resize still 200% (saveCopy prefs kept).
+4. **GIF.** Sprite with ≥2 frames, name `anim.gif`, Export. Expected:
+   `Download/Aseprite/anim.gif`, animates in Gallery/Files preview.
+5. **Frame sequence.** Same sprite, name `frame.png`, Frames = all.
+   Answer the "export as sequence" question with yes. Expected: one
+   `downloads: published … frame1.png …` (or `frame01.png`) line per
+   frame and all files in Download/Aseprite; tip
+   `Exported to Download/Aseprite/frame1.png ... frameN.png`.
+6. **Other options.** Layers = one layer, Frames = a tag, "Apply pixel
+   ratio" (if the sprite has one), "Export for Twitter": export works
+   and the options are remembered the next time.
+7. **Visibility.** Files app → Download → Aseprite shows all exports;
+   Gallery (Albums → Download or "Aseprite") shows the PNG/GIF.
+8. **Sprite sheet.** File > Export Sprite Sheet → Output: Output File
+   and JSON Data fields have only names, no "…". Export. Expected: tip
+   `Exported to Download/Aseprite/<name>.png, <name>.json`, two
+   `downloads: published` lines, both files in Download/Aseprite.
+9. **Save/Save As unchanged.** File > Save As still opens the system
+   picker (ADR 0009) and writes back (`documents: saved … -> content://…`).
+10. **Errors.** If an export fails, the console shows
+   `Cannot save "<name>" to Download/Aseprite/: …`; paste the logcat
+   `downloads: cannot publish …` lines and the Java stack trace.

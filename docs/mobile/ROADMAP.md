@@ -544,6 +544,7 @@ first try in a 20-tap test.
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
 | M4.1 | SAF Open / Save As (ACTION_OPEN_DOCUMENT / CREATE_DOCUMENT) | laf-backend (JNI) + touch-ux (menu wiring) | see below | **code done** (2026-10-22), ADR 0009, `mobile/m3-files` + laf `mobile/laf-files`; awaiting tablet test |
+| M4.1b | Exports always to Download/Aseprite (MediaStore.Downloads), fixes the empty picker export | laf-backend (JNI) + touch-ux (export windows) | TEST_CHECKLIST "Exports to Download/Aseprite" | **code done** (2026-10-22), ADR 0010, `mobile/m3-export` + laf `mobile/laf-export`; awaiting tablet test |
 | M4.2 | Clipboard (text + image) via `ClipboardManager` | laf-backend | see below | todo |
 | M4.3 | 144 Hz and latency | laf-backend | see below | 144 Hz request pulled forward (2026-10-22, `mobile/m3-smooth`: `ANativeWindow_setFrameRate` + preferred display mode, NOTES §6 "Smoothness"); latency/partial redraws todo |
 | M4.4 | Logs and crash collection | build-engineer | see below | todo |

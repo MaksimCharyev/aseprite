@@ -988,6 +988,39 @@ tablet. Design of the file part: ADR 0009.
   `input: soft keyboard hidden by the user`; verbose
   `input: soft keyboard text "…" -> N key event(s)`.
 
+### Exports to Download/Aseprite (2026-10-22, branch `mobile/m3-export`, laf `mobile/laf-export`)
+
+Design: ADR 0010. Not yet tested on the tablet.
+
+- **Why the picker export was empty**: the Export window's
+  `FilenameField` (with `general.editFullPath=false`) rebuilt the
+  picked cache path as sprite folder + relative path
+  (`…/documents/<A>/../<B>/name.png`); the SAF registry compared
+  strings exactly, so `documents: saved … -> content://` never ran.
+  `DocumentsAndroid::findByPath()` now also tries the normalized path.
+- **laf** `os/android/downloads.{h,cpp}` (`DownloadsAndroid`), API in
+  `android_app.h`: `android_downloads_cache_path()` =
+  `$TMPDIR/downloads` (= `<cacheDir>/downloads`),
+  `android_publish_download(path, error)`: files under it are copied to
+  `MediaStore.Downloads` with RELATIVE_PATH `Download/<subdir>/`, our own
+  entry with the same name is overwritten (`"wt"`, IS_PENDING 1→0),
+  then the cache file is deleted. Java: `AsepriteActivity.publishDownload()`,
+  `findDownload()` (API 30+: `QUERY_ARG_MATCH_PENDING`),
+  `mimeTypeForName()` (`MimeTypeMap`, fallback octet-stream).
+- **App**: `src/app/file/android_exports.h` (`android_exports_path()` =
+  `<cacheDir>/downloads/Aseprite`, `android_export_display_name()`,
+  `is_android_export()`); hooks in `FileOp::saveToAndroidDocument()`
+  and `DocExporter::exportSheet()` (JSON); `FilenameField::setFixedPath()`
+  used by the Export and Export Sprite Sheet windows; `saved_to` label
+  in `export_file.xml` (hidden on desktop); status tip
+  `Exported to Download/Aseprite/<name>`.
+- **Logs** (tag `laf`): `downloads: published <cache path> -> Download/Aseprite/<name> (new|replaced, content://media/external_primary/downloads/<id>) in N ms`;
+  errors `downloads: cannot publish … : …` (plus a Java stack trace
+  `downloads: cannot publish …` from `AsepriteActivity`).
+- No permission needed for own MediaStore entries on API 29+; the merged
+  manifest still has only androidx's
+  `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`.
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |
