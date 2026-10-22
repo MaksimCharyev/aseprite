@@ -9,9 +9,11 @@
 #   SKIA_DIR          Skia checkout, default $HOME/deps/skia-m124-android
 #   ANDROID_BUILD_DIR build tree, default <repo>/build/android (git-ignored)
 #   ANDROID_PLATFORM  default 29 (ADR 0004)
+#   HOST_TOOLS_DIR    host gen build tree, default <repo>/build/host-tools
 #   CMAKE_BUILD_TYPE  default RelWithDebInfo (the root CMakeLists default)
 #
 # Extra arguments are passed to cmake, e.g. -DCMAKE_BUILD_TYPE=Debug.
+# Runs build-host-gen.sh first (host-built `gen`, passed as GEN_EXE).
 # Then: cmake --build build/android --target doc-lib render-lib fixmath-lib filters-lib
 set -euo pipefail
 
@@ -36,12 +38,17 @@ toolchain="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
   exit 1
 }
 
+# `gen` runs on the build machine: build it for the host first (ADR 0008).
+"$here/build-host-gen.sh"
+gen_exe="${HOST_TOOLS_DIR:-$repo/build/host-tools}/bin/gen"
+
 cmake -G Ninja -S "$repo" -B "$build" \
   -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM="${ANDROID_PLATFORM:-29}" \
   -DANDROID_STL=c++_static \
   -DLAF_BACKEND=skia \
+  -DGEN_EXE="$gen_exe" \
   -DSKIA_DIR="$SKIA_DIR" \
   -DSKIA_LIBRARY_DIR="$SKIA_DIR/out/Release-arm64" \
   -DENABLE_UPDATER=OFF \

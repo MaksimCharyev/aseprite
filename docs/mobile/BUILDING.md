@@ -91,6 +91,15 @@ dependency sync took several minutes more, network bound.
 
 ## M0.4 Configure and build the non-GUI libraries
 
+The code generator `gen` must run on the laptop, so
+`configure-android.sh` first runs `android/scripts/build-host-gen.sh`, which
+builds it with the **host compiler** (`gcc`/`g++` from `PATH`, override with
+`HOST_CC`/`HOST_CXX`; no sudo needed, any recent gcc or clang works) and the
+SDK cmake/ninja into `build/host-tools` (git-ignored, about 1 minute the
+first time, then incremental). The result, `build/host-tools/bin/gen`, is
+handed to the Android configure as `GEN_EXE`. Run the script alone with
+`android/scripts/build-host-gen.sh`; delete `build/host-tools` to rebuild.
+
 ```
 android/scripts/configure-android.sh          # any cwd; build tree build/android
 source android/scripts/env.sh
@@ -170,6 +179,7 @@ rm -rf ~/.android/bin ~/.android/cli               # Android CLI downloaded by s
 rm -rf ~/.java/.userPrefs/google                   # created by sdkmanager; leave sibling dirs (jetbrains, ...) alone
 rm -rf <repo>/android/.gradle <repo>/android/build <repo>/android/app/build <repo>/android/app/.cxx   # Gradle build trees (git-ignored)
 rm -rf <repo>/build/android                        # planned Android build tree (git-ignored via `build`)
+rm -rf <repo>/build/host-tools                    # host-built gen (M1.1)
 ```
 
 `~/.android/adbkey*` and `analytics.settings` are created by adb itself
