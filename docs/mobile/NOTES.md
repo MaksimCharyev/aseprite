@@ -307,7 +307,7 @@ Patches (file: what):
   `common/event_queue.cpp` needs an `EventQueueImpl` and `CommonSystem` uses
   it); no X11 sources/libs; the Skia-backend OS sources (`os/skia/*`) are not
   built on Android yet. `os/common/system.cpp` skips `makeSkia()` on Android
-  for the same reason. Whoever writes `os/android` must revert both.
+  for the same reason. Both were reverted in M1.3 (laf `3bb409f`).
 - `text/skia_font_mgr.cpp`: `SkFontMgr_New_Android(nullptr)`
   (`include/ports/SkFontMgr_android.h`).
 - `dlgs/CMakeLists.txt`: no sources on Android; `FileDialog::make()` already
@@ -516,6 +516,69 @@ Per-site decisions (Android = `LAF_ANDROID`, `LAF_LINUX` false):
 - Not verified without the tablet: that HarmonyOS 4.3 starts the activity,
   honours the immersive mode and reports the GL strings; see the tablet
   checklist in the M0.5 report.
+
+### laf os/android (M1.3, 2026-10-22)
+
+laf branch `mobile/laf-android` (`3bb409f`, `da608dc`). Build trees used:
+`build/laf-m13-android`, `build/laf-m13-desktop`. Reviewed (M1.3 review).
+The temporary os/none system and the skipped os/skia sources from M0.3 are
+reverted.
+
+- **GameActivity outside Gradle.** The games-activity 4.4.2 AAR `prefab`
+  dir has prebuilt `libgame-activity_static.a` (4 ABIs) + headers; no glue
+  sources needed (`abi.json` says `c++_shared`, links fine with
+  `c++_static`). laf takes `game-activity::game-activity_static` from:
+  (1) an existing target (recommended for M1.4: `find_package(game-activity
+  REQUIRED CONFIG)` in the wrapper before `add_subdirectory`), (2)
+  `find_package(game-activity CONFIG QUIET GLOBAL)`, (3) cache var
+  `LAF_ANDROID_GAMEACTIVITY_DIR=<prefab dir>` (path under
+  `~/.gradle/caches/8.14.6/transforms/<hash>/transformed/games-activity-4.4.2/prefab`,
+  the hash changes).
+- **Linking.** `laf-os` adds `INTERFACE -Wl,-u,Java_com_google_androidgamesdk_GameActivity_initializeNativeCode`;
+  `android_main` lives in `liblaf-os.a` (no `--whole-archive`).
+  `common/main.cpp` is not built on Android. Android test executables would
+  not link (the `-u` pulls the glue) — keep `LAF_WITH_TESTS=OFF` there.
+- **Weak hook `os::android_pre_main`** must be defined in an object of the
+  final `.so` target itself (e.g. `src/main/`), not in `app-lib.a` — a weak
+  reference does not pull an archive member (M1.7).
+- **Glue 4.4.2** already calls `AConfiguration_fromAssetManager` in
+  `android_app_pre_exec_cmd`; laf calls it again on CONFIG_CHANGED. Window
+  size truth = `ANativeWindow_getWidth/Height`.
+- **Logs:** tag `laf`; lifecycle INFO always; per-event verbose logs after
+  the user runs `adb shell setprop debug.laf.verbose 1` and restarts the app.
+- **Environment:** HOME = XDG_CONFIG_HOME = `internalDataPath`; TMPDIR =
+  `Context.getCacheDir()` via JNI (fallback `<parent>/cache`).
+- **Event loop:** `getEvent` → `pollLooper(0)`, then `ALooper_pollOnce`
+  until an event or the deadline; `-1` only while paused without a window
+  (ADR 0007 §4); `queueEvent` from other threads → `ALooper_wake`. App code
+  may run inside `getEvent()` (resize → `handleWindowResize`), like X11
+  ConfigureNotify. Input is only logged until M2.
+- **Capabilities on Android:** WindowScale, ColorSpaces,
+  GpuAccelerationSwitch (no MultipleWindows/CanResizeWindow/CustomMouseCursor).
+- **Scroll sign contract (M1.2 ↔ M2.1):** `delta.y = -AXIS_VSCROLL`,
+  `delta.x = +AXIS_HSCROLL` (like X11/Windows; `state_with_wheel_behavior.cpp:285`
+  relies on it).
+
+**Open follow-ups from the M1.3 review** (owner laf-backend unless noted):
+1. (before M1.8) After `APP_CMD_DESTROY`, `getEvent(kWithoutTimeout)`
+   returns immediately → busy loop if the app doesn't exit at once (e.g. a
+   "Save changes?" dialog with no window) → ANR. Fix: bounded wait
+   (≤100 ms) after DESTROY + watchdog `_exit(0)` 2–3 s after DESTROY if
+   `app_main` hasn't returned (event_queue.cpp:75-78, app.cpp:357-366).
+2. (M1.6 blocker) `SkiaWindowBase::resizeSkiaSurface`
+   (`os/skia/skia_window_base.h:86-107`) abandons the GrDirectContext and
+   destroys the GL context on every resize → rotation recreates GL. Fix in
+   `skia_window_base.h`: opt-in fast path (protected virtual
+   `keepGpuContextOnResize()` overridden by `SkiaWindowAndroid`) that only
+   recreates the render target, plus a protected `recreateGpuRenderTarget()`
+   called after a new EGLSurface in `onNativeWindowAttached()`.
+3. `skia_system.h:52-58` capabilities: use `#if LAF_ANDROID … #else` instead
+   of an early return; keep `#if SK_SUPPORT_GPU` for GpuAccelerationSwitch.
+4. `os/android/main.cpp:48` `std::exit(0)` runs static destructors while
+   app threads may live → consider `_exit(0)` (architect: ADR 0001 says exit).
+5. Key filter: also pass `AKEYCODE_HEADSETHOOK` (79) and `AKEYCODE_MUTE` (91)
+   to the system; update ADR 0006 §11 (architect).
+6. TMPDIR fallback dir isn't created → `mkdir` it.
 
 ## 7. Integration points in the code (for all agents)
 

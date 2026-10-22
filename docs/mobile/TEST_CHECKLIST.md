@@ -97,3 +97,42 @@ Re-run as a regression whenever android/ or the native stub changes.
     Expected: `key #` lines from device "HUAWEI Magnetic Keyboard",
     yellow flash.
     If it fails: `adb logcat -v time -s AsepriteProbe:V`.
+
+## M1 — first `hello_laf` APK (laf os/android backend, from M1.4)
+
+Run when M1.4 produces the `hello_laf` variant. A black or garbage screen
+is fine until M1.5. If a step fails, paste
+`adb logcat -d -s laf:V AndroidRuntime:E DEBUG:F` and `adb logcat -b crash -d`.
+
+1. **Install and launch.** Expected: no crash; `adb logcat -d -s laf` has
+   `android_main: start (sdk 31)`, `HOME=XDG_CONFIG_HOME=/data/user/0/…/files
+   TMPDIR=/data/user/0/…/cache`, `startup: density=400 …`,
+   `input filters installed`, `calling app_main()`, `Window created: …`,
+   `APP_CMD_RESUME`, `APP_CMD_INIT_WINDOW: window 2800x1840`,
+   `Window attached: 2800x1840`.
+2. **No CheckJNI errors.** `adb logcat -d | grep -E "JNI DETECTED|JNI: exception|FATAL"`
+   → empty.
+3. **Rotate ×5.** No crash; `APP_CMD_CONFIG_CHANGED: … orientation=` flips
+   between 1 and 2; `Window resized: 1840x2800` / `2800x1840`.
+4. **Home → back ×5** and **power off/on ×3.** Leaving: `APP_CMD_PAUSE`,
+   `APP_CMD_TERM_WINDOW`, `Window detached`, `APP_CMD_STOP`,
+   `APP_CMD_SAVE_STATE`; returning: `APP_CMD_START`, `APP_CMD_RESUME`,
+   `APP_CMD_INIT_WINDOW`, `Window attached: …`. No crash.
+5. **Idle in background.** Home, wait 30 s,
+   `adb shell top -b -n 1 | grep aseprite` → ~0% CPU.
+6. **Back gesture.** App neither closes nor crashes (ignored until M2/M3).
+7. **Volume up/down.** The system volume panel appears.
+8. **Verbose log** (user runs `adb shell setprop debug.laf.verbose 1`,
+   swipes the app away, relaunches): finger → `motion: … tool=1`; pen →
+   `tool=2`, hover actions `0x9`/`0x7`/`0xa`; pen double-tap → two pairs
+   `key: action=0/1 keyCode=718 scanCode=190`; volume → **no**
+   `keyCode=24/25` lines; Back → `keyCode=4`. Afterwards
+   `adb shell setprop debug.laf.verbose 0`.
+9. **Swipe from Recents.** Process killed without `APP_CMD_DESTROY`;
+   relaunch passes step 1.
+10. **Optional DESTROY path** (user toggles Developer options → "Don't keep
+    activities" ON, then Home): `APP_CMD_DESTROY`, `app_main() returned …`,
+    process exits, clean relaunch. Turn the option off afterwards; paste
+    `adb logcat -d -s laf ActivityManager:I`.
+11. **Dirs.** `adb shell run-as com.github.maksimcharyev.aseprite ls -la` →
+    `files` and `cache` exist.
