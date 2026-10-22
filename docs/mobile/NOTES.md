@@ -627,6 +627,37 @@ on the tablet.
   ms)`; verbose: `GL: <reason>: backend=GL window=… EGLSurface=…` and
   every 2 s `GL: N frames in T s (F fps), flush+swap avg/max`.
 
+### Smoothness: GPU default + 144 Hz (2026-10-22, branch `mobile/m3-smooth`, laf `mobile/laf-smooth`)
+
+laf `mobile/laf-gpu` (M1.6) merged into `mobile/laf-smooth` (from
+`mobile/laf-input`) without conflicts (the GPU code is in `os/skia/*`,
+`os/gl/*`, `os/android/window.h`; M1.10/M2.1 changed `os/android/app.*`).
+Not yet run on the tablet.
+
+- `general.gpu_acceleration` defaults to `true` under `#if LAF_ANDROID`
+  (`src/app/pref/preferences.cpp`, next to screen scale 3). A value saved
+  in `aseprite.ini` still wins (options are saved only when changed, so a
+  first-run ini has no `gpu_acceleration` key). `debug.laf.gpu=0` still
+  forces raster.
+- **Refresh rate.** Two votes, both read `debug.laf.frame_rate` (default
+  144, `0` = don't ask; laf reads it once per process, Java in `onCreate`):
+  - laf `WindowAndroid::setNativeWindow()` (`os/android/window.cpp`) calls
+    `ANativeWindow_setFrameRate(window, 144, COMPATIBILITY_DEFAULT)` for
+    every new ANativeWindow (constructor and `INIT_WINDOW`), loaded with
+    `dlopen("libandroid.so")`/`dlsym` because minSdk is 29. Strategy is the
+    default `ONLY_IF_SEAMLESS`. Log: `Frame rate:
+    ANativeWindow_setFrameRate(144) requested`.
+  - `AsepriteActivity.requestHighRefreshRate()` sets
+    `WindowManager.LayoutParams.preferredDisplayModeId` to the mode with the
+    current physical resolution and the highest refresh rate <= 144 (fallback
+    if HarmonyOS ignores the surface vote). Logs (tag `Aseprite`):
+    `Display modes: <id>:<w>x<h>@<hz> …, current <id> @<hz>` and
+    `Display mode: preferred mode <id> (2800x1840 @144 Hz)`. The system
+    applies it only while the activity is in the foreground; it keeps the
+    panel at 144 Hz even when idle (battery cost while Aseprite is open).
+- Check: `adb shell dumpsys display | grep -iE "mActiveMode|mActiveSfDisplayMode|renderFrameRate|refreshRate"`
+  and `adb shell dumpsys SurfaceFlinger | grep -iE "activeMode|refresh"`.
+
 ### Gradle drives the root CMake (M1.4, 2026-10-22)
 
 Branch `mobile/m1-gradle-native`. Wrapper `android/app/src/main/cpp/CMakeLists.txt`
