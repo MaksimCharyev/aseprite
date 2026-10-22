@@ -76,9 +76,6 @@ Preferences::Preferences() : app::gen::GlobalPref("")
   // Access Framework), the only way to reach shared folders without
   // storage permissions.
   experimental.useNativeFileDialog.setDefaultValue(true);
-  // Skia GL over EGL: the raster path copies every frame with the CPU
-  // and the panel stays at 60 Hz with it.
-  general.gpuAcceleration.setDefaultValue(true);
 #endif
 
   load();

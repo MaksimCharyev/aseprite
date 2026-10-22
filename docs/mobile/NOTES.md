@@ -1248,3 +1248,22 @@ total, +33%): a 16-UI-px button becomes 64 px ≈ 26 dp; the lower screen
 scale keeps a finer canvas zoom granularity. The user can still tune it in
 Edit > Preferences > General (Screen Scaling × UI Elements Scaling). M3.7
 (touch-friendly sizing) remains for widgets that stay too small.
+
+### GPU path breaks the editor canvas (2026-10-22)
+
+With `general.gpu_acceleration=true` (GPU default from the smoothness
+task) the tablet showed: UI fine, but **the editor canvas never shows the
+sprite pixels** (only the transparent checkerboard), while the Preview
+window shows the strokes — the sprite data is correct, the editor's GPU
+rendering path is broken (Aseprite marks GPU acceleration experimental,
+DEVMODE-only on desktop). `debug.laf.gpu 0` → raster → drawing correct.
+Decision: **raster stays the Android default**; the laf EGL path is kept
+for later investigation (Editor rendering with a GL surface, e.g.
+`src/app/ui/editor/editor_render.cpp` / `render/` vs Skia GPU surfaces).
+
+Refresh rate: `preferredDisplayModeId` is accepted by the framework
+(`mDesiredDisplayModeSpecs baseModeId=5` = 144 Hz) but SurfaceFlinger's
+active mode was still 60 Hz with the app idle in the foreground — HarmonyOS
+adaptive refresh overrides it. To check while drawing; next options:
+`ANativeWindow_setFrameRateWithChangeStrategy(ALWAYS)` (API 31), the
+system "Screen refresh rate" setting (High vs Dynamic).
