@@ -181,3 +181,69 @@ already saved `screen_scale=2`, so **uninstall first** (this also removes
    most comfortable with finger and pen.
 8. **No CheckJNI errors.** `adb logcat -d | grep -E "JNI DETECTED|JNI: exception|FATAL"`
    → empty.
+
+## M3 — gestures, palm rejection, pen double-tap (M3.1-M3.5, branch mobile/m3-gestures)
+
+APK: `build/apk/aseprite-aseprite.apk` (laf `mobile/laf-gestures`). No
+uninstall needed (new preferences take their defaults):
+
+    adb install -r build/apk/aseprite-aseprite.apk
+    adb logcat -c
+    adb logcat -v time -s Aseprite:V laf:V AndroidRuntime:E DEBUG:V libc:F
+
+Preparation: File > New, 64×64, pencil tool, zoom so the sprite fills
+most of the screen. Edit > Undo History open on the side helps in steps
+4, 9 and 10.
+
+1. **Pinch zoom.** Two fingers on the canvas, spread them: the sprite
+   zooms in around the point between the fingers (that pixel stays under
+   the fingers); pinch: zooms out. Smooth, no jumps, no dot drawn.
+2. **Two-finger pan.** Two fingers dragged together: the canvas follows
+   the fingers in all directions. Same gesture over the layers list of
+   the timeline and over the palette scrolls them (if they have more
+   content than fits).
+3. **One finger.** With the defaults ("Draw with finger" off), drag one
+   finger on the canvas: the canvas scrolls, no pixels, no entry in the
+   Undo History. A one-finger tap on menus/buttons still clicks them.
+4. **Undo/Redo taps.** Draw three strokes with the pen. Two-finger tap
+   (both fingers down and up quickly, without sliding) on the canvas →
+   the last stroke disappears; again → the second one. Three-finger tap
+   → it comes back. Log: `input: 2-finger tap`, `input: 3-finger tap`.
+   Negative checks: two fingers held ~1 s, or slid a few mm, do **not**
+   undo.
+5. **Pen double-tap.** Pencil selected. Double-tap the pen barrel while
+   hovering over the screen: the toolbar shows the eraser, the next pen
+   stroke erases. Double-tap again (pen away from the screen this time):
+   the pencil is back. 10 double-taps in a row (calmly) = 10 toggles,
+   never two per tap; log has exactly 10 `input: pen double-tap` lines.
+   Select another tool (e.g. spray), double-tap → eraser, double-tap →
+   spray again.
+6. **Rebindable.** Edit > Keyboard Shortcuts, search "undo": Undo shows
+   `Ctrl+Z` and `Two Finger Tap`; "redo" shows `Three Finger Tap`;
+   "eraser": Toggle Eraser shows `Pen Double Tap`. Remove `Two Finger Tap`
+   from Undo, OK, two-finger tap → nothing; back to the dialog, Reset (or
+   add it again by focusing the key field and doing a two-finger tap on
+   it), OK, the tap undoes again.
+7. **Palm while drawing.** Write a word with the pen with the palm resting
+   on the screen the whole time (put the palm down first, then the pen).
+   No stray dots/lines, the canvas does not move or zoom; the Undo History
+   has only the pen strokes.
+8. **Palm right after the pen.** Draw a stroke, lift the pen and put the
+   palm down immediately (< 0.5 s): nothing happens (no scroll, no dot).
+9. **Finger stroke cancelled by the palm.** Preferences > Tablet > Touch
+   and Pen > check "Draw with finger", OK. Make a rectangular selection.
+   Start a finger stroke inside it and then rest the whole palm on the
+   screen and keep it there for ~2 s. The finger stroke disappears, the
+   Undo History has **no** entry for it, **the selection is still there**.
+   Log: `input: finger stream cancelled (palm (too many fingers)), stroke cancelled`
+   or `… (ACTION_CANCEL), stroke cancelled`.
+10. **No dot from gestures with finger drawing on.** Still with "Draw with
+    finger" on: two-finger pan, pinch and two-finger tap on the canvas
+    leave no dot and no extra Undo History entry (the tap removes the last
+    real stroke). A one-finger drag draws. Afterwards uncheck "Draw with
+    finger" again.
+11. **Rejection timeout.** Preferences > Tablet > "Ignore fingers after the
+    pen leaves" = 0, OK: a one-finger drag right after lifting the pen
+    scrolls. Set it back to 500.
+12. **Logs to send**: `adb logcat -d -s laf:I Aseprite:V AndroidRuntime:E`
+    after the run (gesture lines are INFO, no verbose needed).

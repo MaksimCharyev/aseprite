@@ -449,11 +449,11 @@ are not needed for v1; the pen double-tap is a plain key 718.
 
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
-| M3.1 | Palm rejection + finger-stream state machine in the backend | laf-backend | see below | todo |
-| M3.2 | App side of cancel + touch preferences + finger pan | touch-ux | see below | todo |
-| M3.3 | Two-finger pan + pinch zoom | laf-backend | see below | todo |
-| M3.4 | Virtual gesture keys in laf (double-tap 718, 2/3-finger taps) | laf-backend | see below | todo |
-| M3.5 | Gesture shortcuts + `ToggleEraser` command | touch-ux | see below | todo |
+| M3.1 | Palm rejection + finger-stream state machine in the backend | laf-backend | see below | **wip** (2026-10-22): code + host tests on `mobile/m3-gestures` / laf `mobile/laf-gestures`, waiting for the tablet test (TEST_CHECKLIST "M3") |
+| M3.2 | App side of cancel + touch preferences + finger pan | touch-ux | see below | **wip** (2026-10-22): code + host tests on `mobile/m3-gestures` / laf `mobile/laf-gestures`, waiting for the tablet test (TEST_CHECKLIST "M3") |
+| M3.3 | Two-finger pan + pinch zoom | laf-backend | see below | **wip** (2026-10-22): code + host tests on `mobile/m3-gestures` / laf `mobile/laf-gestures`, waiting for the tablet test (TEST_CHECKLIST "M3") |
+| M3.4 | Virtual gesture keys in laf (double-tap 718, 2/3-finger taps) | laf-backend | see below | **wip** (2026-10-22): code + host tests on `mobile/m3-gestures` / laf `mobile/laf-gestures`, waiting for the tablet test (TEST_CHECKLIST "M3") |
+| M3.5 | Gesture shortcuts + `ToggleEraser` command | touch-ux | see below | **wip** (2026-10-22): code + host tests on `mobile/m3-gestures` / laf `mobile/laf-gestures`, waiting for the tablet test (TEST_CHECKLIST "M3") |
 | M3.6 | On-screen modifier bar (+ Back policy review) | touch-ux | see below | todo |
 | M3.7 | Touch-friendly sizing pass | touch-ux | see below | todo |
 | M3.8 | M3 review + tablet checklist | reviewer | see below | todo |

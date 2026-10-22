@@ -788,6 +788,60 @@ tablet.
   the pressure threshold in the dynamics popup below ~0.85. Candidate
   Android default (app side, not done): 0.8.
 
+### Gestures, palm rejection, pen double-tap (M3.1-M3.5, 2026-10-22, branch `mobile/m3-gestures`)
+
+laf branch `mobile/laf-gestures` (from `mobile/laf-input` 8e5aa7b). Changes
+in laf: `os/android/pointer_input.{h,cpp}` (+ tests), a small hunk in
+`os/android/app.cpp`, scancode aliases in `os/keys.h`, one Android field
+in `os/tablet_options.h`. Not yet tested on the tablet. **This section
+supersedes the M2 table above for 2nd+ fingers, `POINTER_UP`,
+`ACTION_CANCEL` and finger rejection.**
+
+| Android input | os::Event |
+|---|---|
+| any cancel of a held button (finger/pen `ACTION_CANCEL`, palm, pen arrival, 2nd finger) | `KeyUp` `kKeyPointerCancel` (= `kKeyUnknown4`, **no KeyDown**), then `MouseUp` |
+| finger `ACTION_DOWN` while the pen is in range/touching, or < `TabletOptions::penRejectionTimeout` (default 500 ms, 0-2000) after it left | whole stream ignored |
+| 2nd finger (`POINTER_DOWN`, 2 pointers) | cancel of the one-finger stroke; stream becomes tap/gesture candidate |
+| 2 fingers, one moved > tap slop (10 dp = 25 px) | `MouseMove` (Touch, no button) at the center once, then per MOVE: `TouchMagnify` (Touchpad, `magnification = dist/lastDist - 1`, emitted when ≥ 0.005) and precise `MouseWheel` (Touchpad, `delta = -(center movement)/scale`, fractions accumulated), both at the fingers' center; reference = positions when the 2nd finger landed |
+| 3rd finger or lifting one of two | gesture ends, rest of the stream does nothing |
+| > 3 fingers (incl. the 8-pointer cap / `actionIndex >= pointerCount`) or `TOOL_TYPE_PALM` | palm: cancel + ignore until next `ACTION_DOWN` |
+| `ACTION_UP` of a stream with max 2 (3) fingers, all down ≤ 150 ms after the first, ≤ 300 ms total, no move > tap slop, no CANCEL | `KeyDown`+`KeyUp` `kKeyTwoFingerTap` (`kKeyThreeFingerTap`) |
+| key `keyCode=718` DOWN, first of a burst (DOWNs < 100 ms after the previous are dropped; UPs and repeats dropped) | `KeyDown`+`KeyUp` `kKeyPenDoubleTap` |
+
+- **Key 718 and M2.3.** `AppAndroid::processInput()` passes every key
+  event to `PointerInputAndroid::processKey()` in its own loop, before the
+  generic key translation. The generic AKEYCODE→scancode path (M2.3,
+  `os/android/keys.cpp`) must skip keys for which
+  `PointerInputAndroid::isGestureKey(keyCode)` is true (only 718 today),
+  otherwise the double-tap would also arrive as an unknown key.
+- **Scancodes.** `os/keys.h`: `kKeyPenDoubleTap/TwoFingerTap/ThreeFingerTap/PointerCancel`
+  = `kKeyUnknown1..4` (values unchanged). Shortcut names (`src/ui/shortcut.cpp`):
+  "Pen Double Tap", "Two Finger Tap", "Three Finger Tap"; PointerCancel has
+  no name (can't be a shortcut).
+- **App side.** `gui.xml` `android=` attribute (read only under
+  `LAF_ANDROID`, before `shortcut=`; Android no longer reads `linux=`, so
+  Exit got `android="Ctrl+Q"`): Two Finger Tap → Undo, Three Finger Tap →
+  Redo, Pen Double Tap → `ToggleEraser` (new command, also on desktop
+  without a default key). `DrawingState::onKeyUp` treats `kKeyPointerCancel`
+  like Esc (tool loop cancelled, no undo entry); `ScrollingState::onKeyUp`
+  restores the scroll from the MouseDown. Prefs `touch.draw_with_finger`
+  (false; when false a finger MouseDown on the canvas starts
+  `ScrollingState`, `Editor::checkForScroll`, `#if LAF_ANDROID`) and
+  `touch.pen_rejection_timeout` (500 ms) in Preferences > Tablet > Touch and Pen.
+- **`gen` pitfall.** A comment as the *first* child of a `<section>` in
+  `data/pref.xml` makes `gen` generate an empty section
+  (`src/gen/pref_types.cpp` uses `FirstChild()->ToElement()`). Desktop
+  builds don't notice when the options are only used under
+  `#if LAF_ANDROID`; put comments before the `<section>`.
+- **Known limitation.** The first finger of a two/three-finger tap sends a
+  `MouseDown` before the second one lands; on a widget (toolbar button,
+  palette) the cancel's `MouseUp` still clicks it. On the canvas nothing is
+  left (stroke rolled back / scroll restored).
+- **Logs** (tag `laf`, INFO): `input: pen double-tap`, `input: 2-finger tap`,
+  `input: 3-finger tap`, `input: finger stream cancelled (<reason>), stroke cancelled`,
+  `input: pen ACTION_CANCEL, stroke cancelled`. Verbose adds gesture start/end
+  and `-> KeyDown … scancode=106`, `-> TouchMagnify … magnification=…`.
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |
