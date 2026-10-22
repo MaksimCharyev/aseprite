@@ -44,6 +44,10 @@
 #include "ui/system.h"
 #include "ver/info.h"
 
+#if LAF_ANDROID
+  #include "os/android/android_app.h"
+#endif
+
 #include "ask_for_color_profile.xml.h"
 #include "open_sequence.xml.h"
 
@@ -356,6 +360,13 @@ FileOp* FileOp::createLoadDocumentOperation(Context* context,
     return nullptr;
 
   LOG("FILE: Loading file \"%s\"\n", filename.c_str());
+
+#if LAF_ANDROID
+  // If the file is a copy of a document picked in the system file
+  // picker, copy it again (e.g. from the recent files list after a
+  // restart), see ADR 0009.
+  os::android_document_from_provider(filename);
+#endif
 
   // Does file exist?
   if (!base::is_file(filename)) {
@@ -999,6 +1010,10 @@ void FileOp::operate(IFileOpProgress* progress)
                      m_filename.c_str());
             break;
           }
+  #if LAF_ANDROID
+          if (!saveToAndroidDocument())
+            break;
+  #endif
         }
 
         m_seq.progress_offset += m_seq.progress_fraction;
@@ -1022,6 +1037,11 @@ void FileOp::operate(IFileOpProgress* progress)
       if (!m_format->save(this)) {
         setError("Error saving the sprite in the file \"%s\"\n", m_filename.c_str());
       }
+  #if LAF_ANDROID
+      else {
+        saveToAndroidDocument();
+      }
+  #endif
     }
 
     // Save special data from .aseprite-data file
@@ -1044,6 +1064,19 @@ void FileOp::operate(IFileOpProgress* progress)
   // Progress = 100%
   setProgress(1.0f);
 }
+
+#if LAF_ANDROID
+// If m_filename is the copy of a document picked in the system file
+// picker, the saved file is copied to that document (ADR 0009).
+bool FileOp::saveToAndroidDocument()
+{
+  std::string error;
+  if (os::android_document_to_provider(m_filename, error))
+    return true;
+  setError("%s\n", error.c_str());
+  return false;
+}
+#endif
 
 // After mark the 'fop' as 'done' you must to free it calling fop_free().
 void FileOp::done()
