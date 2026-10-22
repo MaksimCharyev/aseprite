@@ -167,7 +167,13 @@ void Entry::setCaretPos(const int pos)
     startTimer();
   m_state = true;
 
-  os::System::instance()->setTextInput(true, caretPosOnScreen());
+#if LAF_ANDROID
+  // On Android setTextInput(true) shows the soft keyboard, so only the
+  // focused entry can ask for it (the caret of other entries changes
+  // e.g. when a dialog fills its fields).
+  if (hasFocus())
+#endif
+    os::System::instance()->setTextInput(true, caretPosOnScreen());
 
   invalidate();
 }
