@@ -872,3 +872,30 @@ no AndroidRuntime/DEBUG lines; black screen as expected before M1.5.
 - Swipe from Recents: process killed ("remove task"), as in M0.5.
 - Not checked this run: idle CPU in background (the app was swiped away
   before `top` ran) and the verbose input log — re-check with the next APK.
+
+### M1.8 Aseprite on the device — first run (2026-10-22)
+
+`aseprite-aseprite.apk` (`0.0.3-m1-aseprite`, laf `9f5524a` raster path)
+installed by the user. Result: **Aseprite starts and shows the Home tab**,
+colours correct (default theme), no crash, no AndroidRuntime/DEBUG lines.
+
+- `extracted 189 files in 17 ms` on the first launch; `data up to date` on
+  the next process start. Extraction cost is negligible.
+- Aseprite's default screen scale 2 → raster surface 1400×920 scaled ×2 to
+  the 2800×1840 buffer (`stride=2816`, `format=1` RGBA_8888).
+- Rotation and Home → back: window re-attached / resized and repainted.
+- Screenshot (read-only `adb exec-out screencap -p`) confirms the layout.
+
+User feedback (→ M1.10):
+1. Text small but readable; wants **+50% scale** → default
+   `screen_scale = 3` on Android.
+2. **The menu bar is clipped by the rounded display corners** (top of the
+   "F" of "File" eaten): the app draws edge-to-edge in immersive mode.
+   Needs a safe-area inset (Android 12 `WindowInsets.getRoundedCorner()` /
+   display cutout) exposed by laf and applied as a margin by the app (or a
+   non-drawn border in the laf window).
+3. Logo + "New File… / Open File…" look slightly grey — likely the default
+   theme's link style; compare with a desktop screenshot before treating
+   it as a colour bug.
+4. Launcher icon is the generic Android one — use Aseprite's icon from
+   `data/icons/`.
