@@ -56,6 +56,12 @@
   #include "app/ui/devconsole_view.h"
 #endif
 
+#if LAF_ANDROID
+  #include "os/android/android_app.h"
+
+  #include <algorithm>
+#endif
+
 namespace app {
 
 using namespace ui;
@@ -88,6 +94,24 @@ public:
     Manager::getDefault()->updateAllDisplays(newScreenScale, pref.general.gpuAcceleration());
   }
 };
+
+#if LAF_ANDROID
+// The main window is drawn edge to edge on Android, so we keep its
+// content inside the safe area of the display (rounded corners,
+// display cutout) with a border. laf gives the insets in pixels, the
+// border is in UI coordinates (pixels divided by the screen scale).
+static void update_safe_area_border(ui::Window* window)
+{
+  const ui::Display* display = window->display();
+  const int scale = (display && display->nativeWindow() ? std::max(1, display->scale()) : 1);
+  const gfx::Border insets = os::android_safe_area_insets();
+  auto toUI = [scale](const int px) { return (px + scale - 1) / scale; };
+  window->setBorder(gfx::Border(toUI(insets.left()),
+                                toUI(insets.top()),
+                                toUI(insets.right()),
+                                toUI(insets.bottom())));
+}
+#endif
 
 MainWindow::MainWindow()
   : ui::Window(ui::Window::DesktopWindow)
@@ -503,6 +527,9 @@ void MainWindow::onInitTheme(ui::InitThemeEvent& ev)
 {
   ui::Window::onInitTheme(ev);
   noBorderNoChildSpacing();
+#if LAF_ANDROID
+  update_safe_area_border(this);
+#endif
   if (m_previewEditor)
     m_previewEditor->initTheme();
 
@@ -513,6 +540,12 @@ void MainWindow::onInitTheme(ui::InitThemeEvent& ev)
 
 void MainWindow::onResize(ui::ResizeEvent& ev)
 {
+#if LAF_ANDROID
+  // The insets can change with the size (rotation) or screen scale,
+  // the border must be updated before the children are laid out.
+  update_safe_area_border(this);
+#endif
+
   ui::Window::onResize(ev);
 
   // Load default or user-selected layout after the first resize event
