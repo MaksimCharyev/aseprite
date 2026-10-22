@@ -64,7 +64,7 @@ may be empty; that is fine — paste everything.)
 
 ## 3. M-Pencil: side button and double-tap
 
-Status: **reported, not verified on the user's device.** Update: see §9, verified 2026-10-21 (evdev `KEY_F20`; Android key code 718 still to confirm in M0.6).
+Status: **verified on the device 2026-10-22** (§9 "M0.6 input probe on the device"): Android `keyCode=718`, `scanCode=190`, two DOWN/UP pairs per double-tap. The research below is kept for history.
 
 - **User's pen (confirmed 2026-10-21): M-Pencil 3rd gen** — no side
   button; double-tap on the barrel is the only pen gesture.
@@ -121,7 +121,7 @@ near the screen; paste the output.
 
 ## 4. Palm rejection signals
 
-Status: **documented** (Android); device behaviour **not verified**.
+Status: **verified on the device 2026-10-22** (§9 "M0.6 input probe on the device"): no `TOOL_TYPE_PALM`, no `FLAG_CANCELED`; palm = several FINGER pointers, then the system sends `ACTION_CANCEL` and swallows the palm. The research below is kept for history.
 
 - `getToolType()`: `TOOL_TYPE_FINGER` (1), `TOOL_TYPE_STYLUS` (2),
   `TOOL_TYPE_MOUSE` (3), `TOOL_TYPE_ERASER` (4). In the NDK,
@@ -142,7 +142,7 @@ Status: **documented** (Android); device behaviour **not verified**.
   has `source`, `action`, `flags`, `buttonState`, `actionButton`,
   per-pointer `toolType` and axis values, and the historical samples
   (`GameActivityEvents.h`). Its default motion filter keeps only events
-  with `source & SOURCE_TOUCHSCREEN` — stylus (0x4002) passes because of the
+  with `source & SOURCE_TOUCHSCREEN` — stylus (0x5002 on this device) passes because of the
   shared pointer class bit, but we will install our own filter anyway
   (ADR 0001).
 - Optional later: Jetpack low-latency front-buffer rendering (API 29+) and
