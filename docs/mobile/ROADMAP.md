@@ -35,10 +35,10 @@ know how the device really reports pen/touch/keys.
 | M0.1 | Host toolchain | build-engineer | see below | **done** (2026-10-21) |
 | M0.2 | Skia m124 for Android | build-engineer | see below | **done** (2026-10-21) |
 | M0.3 | `LAF_ANDROID` platform in laf CMake + base | build-engineer | see below | **done** (2026-10-22), laf branch `mobile/laf-android` + clip branch `mobile/android` (both forks) |
-| M0.4 | Cross-build non-GUI libs | build-engineer | see below | **done** (2026-10-22), branch `mobile/m0-libs`, uncommitted; see NOTES section 6 |
+| M0.4 | Cross-build non-GUI libs | build-engineer | see below | **done** (2026-10-22), branch `mobile/m0-libs`; see NOTES section 6 |
 | M0.5 | Gradle skeleton + GameActivity "hello" APK | build-engineer | see below | **done** (2026-10-22), branch `mobile/m0-gradle`; passed on the tablet (NOTES §9, "M0.5 on the device") |
 | M0.6 | Input probe APK | touch-ux | see below | **done** (2026-10-22): double-tap = keyCode 718 confirmed, hover OK, palm = FINGER + ACTION_CANCEL (NOTES §9 "M0.6"); palm while drawing re-tested OK (system swallows the palm after CANCEL) |
-| M0.7 | M0 review + device info checklist | reviewer | see below | todo |
+| M0.7 | M0 review + device info checklist | reviewer | see below | **done** (2026-10-22): M0 accepted by the reviewer; checklist in TEST_CHECKLIST.md |
 
 **M0.1 Host toolchain.** Install, user-local without sudo where possible,
 under `~/Android/Sdk`: JDK 17, Android cmdline-tools, `platform-tools`,
@@ -125,81 +125,201 @@ the Android-level results (double-tap key code, hover, palm tool type /
 
 ## M1 — Bring-up: laf on Android, Aseprite shows the Home tab
 
+Inputs from M0 (NOTES.md §6, §9): `app-lib` is blocked only by the
+target-built `gen` and `user_agent.cpp`; `data/` is already packaged as
+APK assets (at the asset root, from the source tree); EGL/GLES 3.2 and the
+lifecycle sequence are verified; swipe-from-Recents SIGKILLs the process;
+`LOW_MEMORY` follows every `SAVE_STATE`; the display runs at 120 Hz with
+`swapInterval=1`. ADRs: 0001 (GameActivity), 0002 (assets), 0003
+(`LAF_ANDROID`), 0007 (background flush), 0008 (native build).
+
+Order: M1.1-M1.2 (build-engineer) and M1.3 (laf-backend) can run in
+parallel; M1.4 needs M1.3; M1.8 needs M1.2, M1.6, M1.7.
+
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
-| M1.1 | `laf/os/android` skeleton: system, event queue, window, screen | laf-backend | see below | todo |
-| M1.2 | CPU raster window path + `hello_laf` APK | laf-backend | see below | todo |
-| M1.3 | EGL context + Skia GL surface | laf-backend | see below | todo |
-| M1.4 | Asset packaging + extraction + env (ADR 0002) | build-engineer | see below | todo |
-| M1.5 | Aseprite as `libaseprite.so` in the APK | build-engineer | see below | todo |
-| M1.6 | First-run defaults for Android | touch-ux | see below | todo |
-| M1.7 | M1 review + tablet checklist | reviewer | see below | todo |
+| M1.1 | Host-built `gen` for cross-compiling (ADR 0008 §1) | build-engineer | see below | todo |
+| M1.2 | `app-lib` compiles for Android | build-engineer | see below | todo |
+| M1.3 | `laf/os/android`: system, ALooper event loop, window, screen, lifecycle | laf-backend | see below | todo |
+| M1.4 | Gradle drives the root CMake; native variants `probe` / `hello_laf` / `aseprite` (ADR 0008 §2-3) | build-engineer | see below | todo |
+| M1.5 | CPU raster window path, `hello_laf` visible | laf-backend | see below | todo |
+| M1.6 | EGL context + Skia GL surface | laf-backend | see below | todo |
+| M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | todo |
+| M1.8 | Aseprite as `libaseprite.so` (`aseprite` variant) | build-engineer | see below | todo |
+| M1.9 | Flush preferences + data recovery on background (ADR 0007) | touch-ux | see below | todo |
+| M1.10 | First-run defaults for Android | touch-ux | see below | todo |
+| M1.11 | M1 review + tablet checklist | reviewer | see below | todo |
 
-**M1.1 `laf/os/android` skeleton.** New files under `laf/os/android/`:
-`main.cpp` (`android_main` → `app_main`, see ADR 0001), `system.h/.cpp`
-(`SystemAndroid`, base for `SkiaSystem` in
-`laf/os/skia/skia_system.h:21-31`; capabilities: none of
-MultipleWindows/CanResizeWindow/CustomMouseCursor; GPU switch on),
-`event_queue.h/.cpp` (`getEvent` = `ALooper_pollOnce` + APP_CMD processing
-+ input buffer swap), `window.h/.cpp` (single window bound to
-`app->window`; `ResizeWindow` event on `APP_CMD_WINDOW_RESIZED` /
-`CONFIG_CHANGED`; `CloseWindow` never sent by the OS), `screen.cpp`
-(size and density from `AConfiguration`). Wire into
-`laf/os/CMakeLists.txt` and `laf/os/skia/skia_window.h:12-23`,
-`skia_system.h:21-31`, `laf/os/common/system.cpp:44-63`. No input yet.
-Accept: laf builds for Android with `LAF_BACKEND=skia`; desktop build OK.
+**M1.1 Host `gen`** (ADR 0008 §1). New `android/scripts/build-host-gen.sh`:
+configure `build/host-tools` with the host compiler and the SDK
+CMake/Ninja (`source android/scripts/env.sh`), `-DLAF_BACKEND=none`,
+`ENABLE_UPDATER/NEWS/DRM/STEAM/SENTRY/DESKTOP_INTEGRATION/WEBSOCKET/TESTS/CCACHE=OFF`,
+`LAF_WITH_EXAMPLES=OFF LAF_WITH_TESTS=OFF`; build only target `gen`;
+idempotent. `android/scripts/configure-android.sh` runs it first and adds
+`-DGEN_EXE=$repo/build/host-tools/bin/gen`. This uses the existing upstream
+hook `src/CMakeLists.txt:76-79` (imported `gen`, no `GEN_DEP`), so no edit
+of `src/app/CMakeLists.txt` (generation rules at `:13-87`, target
+`generate_files` at `:92`) should be needed; if one is, explain why. Update
+`docs/mobile/BUILDING.md` (host compiler requirement, new build dir) and
+record results in NOTES.md §6. (NOTES §6 says "~line 819" for the rules;
+the real lines are 13-87, line 819 is only the include dir.)
+Accept (build, reviewer): `file build/host-tools/bin/gen` says x86-64;
+after a fresh `configure-android.sh`,
+`cmake --build build/android --target generate_files` succeeds and
+`build/android/src/app/pref.xml.h` exists; `grep -c qemu` on the build log
+is 0; `cmake --build build/android --target app-lib` gets past all
+generated headers (remaining compile errors are listed in NOTES.md for
+M1.2, not fixed here); desktop configure/build unchanged (`git diff`
+touches no shared CMake, or the diff is desktop-neutral).
 
-**M1.2 CPU raster path.** `SkiaWindowAndroid::onPaint` copies the Skia
-bitmap to `ANativeWindow_lock` buffers (`WINDOW_FORMAT_RGBA_8888`), like
-`laf/os/skia/skia_window_x11.cpp:58-100`; surface recreated on
-`APP_CMD_INIT_WINDOW`, painting skipped while there is no window. Build
-`laf/examples/hello_laf.cpp` as an alternative APK variant
-(`-PlafExample=hello_laf`).
-Accept: tablet shows the hello_laf window content, colours correct (red is
-red — validates the RGBA decision in ADR 0005), survives Home → back.
-
-**M1.3 EGL + Skia GL.** `laf/os/gl/gl_context_egl.h` implementing
-`os::GLContext` (`laf/os/gl/gl_context.h`) with EGL 1.4, GLES 3 context,
-window surface from `ANativeWindow`; destroy surface on
-`APP_CMD_TERM_WINDOW`, recreate on `INIT_WINDOW` without losing the
-`GrDirectContext` when possible. `SkiaGL::attachGL`
-(`laf/os/skia/skia_gl.cpp:31`) must work with it.
-Accept: hello_laf runs with GPU on; logcat shows "OS: Using OpenGL
-backend"; Home → back and rotate 10× without crash or black screen.
-
-**M1.4 Assets.** Gradle task copies the CMake `copy_data` output
-(`src/CMakeLists.txt:179`) to `assets/data/`, writes
-`assets/data.manifest` with a content hash; native extractor in
-`laf`-independent Android glue (`android/app/src/main/cpp/`) runs before
-`app_main`, sets `HOME`, `XDG_CONFIG_HOME`, `TMPDIR` (ADR 0002), and
-logs extraction time. `base::get_user_docs_folder()`
-(`laf/base/fs_unix.h:199`) returns the external files dir on Android.
-Accept: tablet, first launch logs "extracted N files in X ms", second
-launch logs "data up to date";
-`adb shell run-as com.github.maksimcharyev.aseprite ls files/aseprite/data`
-lists `gui.xml pref.xml widgets ...`.
-
-**M1.5 Aseprite in the APK.** `src/CMakeLists.txt:184-229`: on `ANDROID`
-build `add_library(aseprite SHARED main/main.cpp)` linked to `app-lib`
-and laf's `android_main`; fix compile errors under `LAF_ANDROID`
-(`src/app/app.cpp:82,309,395,501`, `src/app/file_selector.cpp:23-105`,
-`src/app/script/app_os_object.cpp:29`,
+**M1.2 `app-lib` compiles for Android.** Fix what M1.1 uncovers, all
+behind `LAF_ANDROID`, smallest change each:
+`src/updater/user_agent.cpp:52-60` gets an `#elif LAF_ANDROID` branch
+writing `"Android " << android_get_device_api_level()` (decision: guard in
+`src`, do not invent `distroName/distroVer` in laf `base/platform.h:74-76`;
+no ADR, one-file change); `src/app/app.cpp:82,309,395,501`,
+`src/app/file_selector.cpp:23-105`, `src/app/script/app_os_object.cpp:29`,
 `src/app/ui/editor/state_with_wheel_behavior.cpp:285`,
-`src/ui/window.cpp:866`, `src/app/pref/preferences.cpp:56`). Gradle
-`externalNativeBuild` drives the root CMake with the ADR 0003 options.
-Accept: tablet shows the Aseprite main window with the Home tab, readable
-(even if tiny) and with correct colours; logcat has no `FATAL`.
+`src/ui/window.cpp:866`, `src/app/pref/preferences.cpp:56` (decide per site
+whether Android behaves like Linux or like "other"; write the choice in the
+commit message), `src/app/ui/select_shortcut.cpp:184` (`__linux__` is also
+defined on Android → use `LAF_LINUX`). Do not touch
+`keyboard_shortcuts.cpp:47-66` yet (M3.5). Uses laf as on branch
+`mobile/laf-android` (os/none is fine for compiling).
+Accept (build): `cmake --build build/android --target app-lib` succeeds for
+arm64; desktop build + `ctest` unchanged.
 
-**M1.6 First-run defaults.** Under `#if LAF_ANDROID` in
-`src/app/pref/preferences.cpp:55-65`: `gpu_acceleration=true`,
-`screen_scale` and `ui_scale` from screen density (e.g. density ≥ 2.5 →
-screen 2, ui 2; document the formula), native file dialog off,
-`experimental.multipleWindows=false`.
-Accept: tablet, fresh install: Home tab text and icons are comfortably
-legible at arm's length; Edit > Preferences shows the chosen values.
+**M1.3 `laf/os/android`** (laf fork, branch `mobile/laf-android`).
+- **Revert the M0.3 temporary hacks**: `laf/os/CMakeLists.txt` Android
+  branch (`:52-53` os/none, `:75` skia OS sources skipped, `:141`) and
+  `laf/os/common/system.cpp:49` (`makeSkia()` skipped on Android).
+- `main.cpp`: `android_main` (ADR 0001) stores the `android_app*`
+  (accessor `os::android_app()` in an Android-only laf header for
+  app-side code), sets `HOME`, `XDG_CONFIG_HOME`, `TMPDIR` (ADR 0002 §2;
+  generic laf part), installs the motion filter (all sources incl. hover)
+  and the key filter of ADR 0006 §11 (system keys pass to the system),
+  enables the axes of ADR 0006 §1, calls an optional app pre-main hook
+  (weak symbol, used by M1.7), then `app_main`; on return
+  `GameActivity_finish()` + `exit(0)`.
+- `event_queue.{h,cpp}`: resolve the TODO in `os/android/event_queue.h:24-26`:
+  `getEvent(ev, timeout)` = drain queue, else `ALooper_pollOnce(timeoutMs)`
+  and process `APP_CMD_*` / swap input buffers; `queueEvent()` from other
+  threads calls `ALooper_wake()`. While paused with an empty queue it may
+  block with `-1` (ADR 0007 §4).
+- Commands: `INIT_WINDOW`/`TERM_WINDOW` → window surface attach/detach
+  (synchronously, ADR 0001); `PAUSE`/`RESUME` → `AppLeave`/`AppEnter`
+  (ADR 0007); `LOW_MEMORY` → log only (it follows every `SAVE_STATE` on
+  HarmonyOS, NOTES §9); `CONFIG_CHANGED` → **refresh the configuration
+  with `AConfiguration_fromAssetManager(app->config, assetManager)`**
+  (otherwise density/orientation stay stale, M0.7 review) and, with
+  `WINDOW_RESIZED`/`CONTENT_RECT_CHANGED`, emit `ResizeWindow`.
+- `SystemAndroid` as base of `SkiaSystem` (`laf/os/skia/skia_system.h:21-31`;
+  capabilities: no MultipleWindows/CanResizeWindow/CustomMouseCursor),
+  single window bound to `app->window` (`skia_window.h:12-23`), screen size
+  and density from `AConfiguration` (density exposed for M1.10).
+- **JNI rule** (M0.7 review): cache `jclass`/`jmethodID`s once at startup
+  (global refs) and call `ExceptionCheck()`/`ExceptionClear()` after every
+  `GetMethodID`/`Call*` — debuggable builds run CheckJNI, which aborts on a
+  pending exception. Do not copy the probe's `describeDevice` pattern
+  (`android/app/src/main/cpp/main.cpp:515-594`).
+- No input mapping yet (M2).
+Accept (build): laf builds for Android with `LAF_BACKEND=skia` **and** the
+`os/skia` sources; `hello_laf` links as a shared library with
+`-Wl,--no-undefined`; desktop laf build + `ctest` pass.
 
-**M1.7 Review.** Desktop build + tests, guards (`LAF_ANDROID`/`ANDROID`),
-no EULA-violating additions, and a tablet checklist for the user.
+**M1.4 Gradle drives the root CMake** (ADR 0008 §2-3). Wrapper
+`android/app/src/main/cpp/CMakeLists.txt` → `add_subdirectory(<repo>)`
+with the ADR 0003 §5 options, `GEN_EXE`, Skia dirs; `preBuild` runs
+`build-host-gen.sh`; `-PnativeTarget=probe|hello_laf|aseprite` (default
+`aseprite` once M1.8 lands; until then `probe`), all producing
+`libaseprite.so`; `versionName` suffix per variant; Java key logging in
+`AsepriteActivity.dispatchKeyEvent` only in `probe` (`BuildConfig`
+field), `OnHoverListener` kept in all variants; native CMake build type
+`RelWithDebInfo`. `laf_add_example` builds a SHARED library on Android.
+Accept: `./gradlew :app:assembleDebug -PnativeTarget=probe` and
+`-PnativeTarget=hello_laf` both produce an APK. Tablet: probe variant
+behaves as in M0.6 (double-tap logs keyCode 718); `hello_laf` variant
+starts and `adb logcat -s laf:V` shows `android_main`, the window size
+2800×1840 and density 400 (black screen is fine here).
+
+**M1.5 CPU raster path.** `SkiaWindowAndroid::onPaint` copies the Skia
+bitmap to `ANativeWindow_lock` buffers (`WINDOW_FORMAT_RGBA_8888`), like
+`laf/os/skia/skia_window_x11.cpp:58-100`; painting skipped while there is
+no window; repaint after `INIT_WINDOW`.
+Accept: tablet, `hello_laf` variant: content visible, red is red (RGBA,
+ADR 0005); Home → back ×5 and rotate ×5 without crash or stale size.
+
+**M1.6 EGL + Skia GL.** `laf/os/gl/gl_context_egl.h` implementing
+`os::GLContext` (`laf/os/gl/gl_context.h`): EGL 1.4, GLES 3 context,
+window surface from `ANativeWindow`, `swapInterval=1` (120 Hz, as measured;
+144 Hz is M4.3). **Keep `EGLDisplay` + `EGLContext` (and the Skia
+`GrDirectContext`) across `TERM_WINDOW`; destroy/recreate only the
+`EGLSurface`** (`EGL_KHR_surfaceless_context` is available, NOTES §9; the
+M0.5 stub tears everything down, `android/app/src/main/cpp/main.cpp:125-141`
+— do not copy). Full context recreation only on `EGL_CONTEXT_LOST`.
+`SkiaGL::attachGL` (`laf/os/skia/skia_gl.cpp:31`) must work with it.
+Accept: tablet, `hello_laf` with GPU on: `adb logcat -s laf:V` shows
+"OS: Using OpenGL backend" (`skia_gl.cpp:49`) once per launch (not per
+resume); Home → back ×5 and power off/on ×5 without crash, black screen
+or GPU-resource loss (no second "Using OpenGL backend", no
+`GrDirectContext` recreation in the log); rotate ×5 OK.
+
+**M1.7 Assets** (ADR 0002, ADR 0008 §4). Replace
+`assets.srcDirs = ['../../data']` (assets at the APK root today) with a
+Gradle task that copies `data/` plus the `copy_data` extras (`README.md`,
+`AUTHORS.md`, `EULA.txt`, `docs/LICENSES.md`, `src/CMakeLists.txt:156-179`)
+into a generated `assets/data/` and writes `assets/data.manifest` (file
+list + content hash). The manifest is built from what is actually
+packaged (AGP's default `ignoreAssetsPattern` drops `.*`, `_*` dirs, `*~`).
+Native extractor in Aseprite's Android glue (pre-main hook from M1.3):
+compares hash with `<filesDir>/aseprite/data/.stamp`, re-extracts on
+change, logs time. `base::get_user_docs_folder()`
+(`laf/base/fs_unix.h:199`) returns the external files dir on Android.
+Accept: tablet, `aseprite` or `hello_laf` variant: first launch logs
+"extracted N files in X ms" (N = number of lines in the manifest), second
+launch "data up to date";
+`adb shell run-as com.github.maksimcharyev.aseprite ls files/aseprite/data`
+lists `gui.xml pref.xml widgets extensions ...`; reinstall of a changed
+APK re-extracts.
+
+**M1.8 Aseprite in the APK.** `src/CMakeLists.txt:184-229`: under
+`ANDROID` build `add_library(aseprite SHARED main/main.cpp)` linked with
+`app-lib` and laf's Android `os` (provides `android_main`); default Gradle
+variant becomes `aseprite`.
+Accept: tablet shows the Aseprite main window with the Home tab, correct
+colours, readable even if tiny; Home → back ×3 and rotate ×3 keep it
+drawn; logcat (filter at the top) has no `FATAL`/`F DEBUG`.
+
+**M1.9 Background flush** (ADR 0007). ui: virtual
+`Manager::onAppLeave/onAppEnter` (next to `src/ui/manager.h:153`) called
+for `os::Event::AppLeave/AppEnter` in `generateMessagesFromOSEvents()`
+(`src/ui/manager.cpp:439-617`); app: `CustomizedGuiManager`
+(`src/app/modules/gui.cpp:84-105`) overrides `onAppLeave()` under
+`#if LAF_ANDROID`: `Preferences::instance().save()` +
+`flush_config_file()` (`src/app/ini_file.cpp:127`), and a new
+`BackupObserver::backupNow()` (wake `m_wakeup`,
+`src/app/crash/backup_observer.cpp:143`) through `DataRecovery`; log
+timings with tag/prefix `Aseprite`.
+Accept: tablet: change a preference (e.g. Edit > Preferences > a
+checkbox), press Home → log shows "prefs saved in X ms" and "backup
+requested"; swipe the app away from Recents, relaunch → the preference
+change is kept. (Full drawing + recovery scenario is M2.5.) Desktop:
+no behaviour change.
+
+**M1.10 First-run defaults.** Under `#if LAF_ANDROID` in
+`src/app/pref/preferences.cpp:50-65` (first run only):
+`gpu_acceleration=true` (`data/pref.xml:157`), screen/UI scale from the
+laf screen density: proposal `screen_scale = clamp(round(dpi / 133), 1, 4)`
+→ **3** at 400 dpi with `ui_scale=1` (≈ desktop physical size at 92 dpi,
+logical 933×613), `use_native_file_dialog=false`,
+`multiple_windows=false`. `gui.cpp:126-162` then keeps the value.
+Accept: tablet, fresh install (`adb uninstall` first): Home tab text and
+icons legible at arm's length; Edit > Preferences shows the values; the
+user tries 2/1 and 2/2 and reports which is best (feeds M3.7).
+
+**M1.11 Review.** Desktop build + tests, guards (`LAF_ANDROID`/`ANDROID`),
+no EULA-violating additions (no INTERNET, no release signing), JNI rule of
+M1.3, and a tablet checklist for the user.
 Accept: user confirms checklist items.
 
 ---
@@ -209,49 +329,71 @@ Accept: user confirms checklist items.
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
 | M2.1 | Pen + finger → mouse events with pressure and history | laf-backend | see below | todo |
-| M2.2 | Hover → cursor/brush preview | laf-backend | see below | todo |
-| M2.3 | Hardware keyboard → scancodes + modifiers | laf-backend | see below | todo |
+| M2.2 | Hover → cursor/brush preview (no distance) | laf-backend | see below | todo |
+| M2.3 | Hardware keyboard, key filter, Back | laf-backend | see below | todo |
 | M2.4 | Soft keyboard / IME via GameTextInput | laf-backend | see below | todo |
-| M2.5 | Lifecycle robustness (pause/resume, surface loss, process death) | laf-backend | see below | todo |
+| M2.5 | Lifecycle robustness (surface loss, SIGKILL, recovery) | laf-backend | see below | todo |
 | M2.6 | Files in app-specific storage | build-engineer | see below | todo |
 | M2.7 | M2 review + tablet checklist | reviewer | see below | todo |
 
-**M2.1** (ADR 0006 §1-2). `GameActivityMotionEvent` → `MouseDown/Move/Up`
-with `PointerType::Pen/Eraser/Touch/Mouse`, pressure, every historical
-sample emitted; only the first active pointer drives the mouse for now;
-stylus primary button → right button. Coordinates in window pixels then
-divided by `Window::scale()`.
-Accept: tablet, pencil tool: smooth lines with fast strokes (no
-polygonal corners), pressure works when the brush has pressure dynamics
-enabled (`src/app/ui/dynamics_popup.cpp:538`), menus and buttons react to
-pen taps and finger taps.
+**M2.1** (ADR 0006 §1-2, §10). Axes enabled in M1.3
+(`GameActivityPointerAxes_enableAxis`: PRESSURE, TILT, ORIENTATION,
+TOUCH_MAJOR/MINOR; without it pressure is always 0, NOTES §4).
+`GameActivityMotionEvent` → `MouseDown/Move/Up`; stylus →
+`PointerType::Pen` with pressure, finger → `PointerType::Touch`; every
+historical sample emitted; only the first active pointer drives the mouse
+for now (gesture/palm logic is M3). Coordinates in window pixels divided
+by `Window::scale()`. Max 8 pointers per event
+(`GAMEACTIVITY_MAX_NUM_POINTERS_IN_MOTION_EVENT`, `GameActivityEvents.h:159`):
+guard `actionIndex >= pointerCount`, never define the `_OVERRIDE`.
+Stylus button mapping kept but not testable (M-Pencil 3 `buttonState` is
+always 0). `ACTION_CANCEL` here: plain `MouseUp` placeholder, replaced in
+M3.1. Write the input translation so it is host-testable (pure C++ fed
+with synthetic events).
+Accept: tablet, pencil tool: fast strokes stay smooth (no polygonal
+corners); with pressure dynamics on (`src/app/ui/dynamics_popup.cpp:538`)
+light/heavy pressure changes the size; menus and buttons react to pen and
+finger taps.
 
-**M2.2** Hover enter/move/exit → `MouseEnter/MouseMove/MouseLeave`.
-Accept: tablet, hovering the pen over the canvas shows the brush preview
-following the tip; it disappears when the pen moves away.
+**M2.2** (ADR 0006 §3). Hover arrives through `AsepriteActivity`'s
+`OnHoverListener` (keep it). `HOVER_ENTER/MOVE/EXIT` →
+`MouseEnter/MouseMove/MouseLeave` with `PointerType::Pen`; no
+`AXIS_DISTANCE` (always 0), only a "pen in range" flag; defer
+`MouseLeave` ~50 ms and drop it when a stylus `DOWN` follows (Android
+sends `HOVER_EXIT` just before `DOWN`). Log the actual order once
+(verbose) so the tablet run confirms it.
+Accept: tablet: hovering shows the brush preview following the tip; it
+disappears when the pen leaves hover range; no preview flicker when the
+tip touches down or lifts.
 
-**M2.3** `AKEYCODE_*` → `os::KeyScancode` table
+**M2.3** (ADR 0006 §11). `AKEYCODE_*` → `os::KeyScancode` table
 (`laf/os/android/keys.cpp`), `metaState` → `KeyModifiers`,
-`System::isKeyPressed/keyModifiers` (`laf/os/system.h:187,193`); Back key →
-`kKeyEsc` (never finishes the activity).
-Accept: tablet with a Bluetooth/USB keyboard: B selects brush, Ctrl+Z
-undoes, Space+drag pans; Back key closes an open dialog.
+`System::isKeyPressed/keyModifiers` (`laf/os/system.h:187,193`). Key
+filter returns false for volume/camera/zoom/media/power/brightness keys
+(system handles them); Back (key and gesture) → `kKeyEsc`, never finishes
+the activity. Key 718 is not mapped here (M3.4); log it only.
+Accept: tablet with the Huawei Magnetic Keyboard: B selects brush, Ctrl+Z
+undoes, Space+drag pans, Shift+click draws a line; Back gesture closes an
+open dialog/menu; volume keys change the volume while Aseprite is in
+front.
 
 **M2.4** `System::setTextInput()` (`laf/os/system.h:205`) shows/hides the
 soft keyboard (`GameActivity_showSoftInput/hideSoftInput`); text from
 GameTextInput state diff → `KeyDown` with `unicodeChar`; Backspace/Enter
-mapped.
-Accept: tablet, Sprite > Properties (or layer rename): tapping the field
-opens the on-screen keyboard, typed text (incl. Cyrillic) appears, Enter
-confirms, keyboard hides when the dialog closes.
+mapped. With the Magnetic Keyboard attached the soft keyboard should not
+pop up (system decides; just verify).
+Accept: tablet without the keyboard: Sprite > Properties (or layer
+rename): tapping the field opens the on-screen keyboard, typed text (incl.
+Cyrillic) appears, Enter confirms, keyboard hides when the dialog closes.
 
-**M2.5** Surface destroy/recreate without losing documents; on
-`APP_CMD_PAUSE` trigger a data-recovery backup; `APP_CMD_LOW_MEMORY` →
-log; resizing (split-screen / rotation) → `ResizeWindow`.
-Accept: tablet: draw something, press Home, open 5 other apps, return —
-drawing intact; rotate during drawing — no crash; force-stop via
-`adb shell am force-stop com.github.maksimcharyev.aseprite`, relaunch —
-Aseprite offers to recover the session.
+**M2.5** (ADR 0007). Surface destroy/recreate without losing documents or
+GPU resources (M1.6); split-screen / rotation → `ResizeWindow`;
+`LOW_MEMORY` stays log-only; verify M1.9's flush under real edits.
+Accept: tablet: (a) draw, Home, open 5 other apps, return — drawing intact;
+(b) draw, Home, wait 3 s, **swipe the app away from Recents**, relaunch —
+Aseprite offers to recover the session with the latest strokes;
+(c) same with `adb shell am force-stop com.github.maksimcharyev.aseprite`;
+(d) rotate while drawing — no crash.
 
 **M2.6** Default open/save directory = external files dir
 (`/sdcard/Android/data/<appId>/files`); Aseprite's own file selector
@@ -264,68 +406,98 @@ desktop Aseprite.
 
 ## M3 — Touch UX
 
+The probe made several items simpler (ADR 0006, NOTES §9 M0.6): the
+system already rejects a resting palm after its `ACTION_CANCEL`; there is
+no PALM tool type and no FLAG_CANCELED to handle; touchMajor heuristics
+are not needed for v1; the pen double-tap is a plain key 718.
+
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
-| M3.1 | Palm rejection (stylus priority, PALM, ACTION_CANCEL) | laf-backend + touch-ux prefs | see below | todo |
-| M3.2 | Two-finger pan + pinch zoom | laf-backend | see below | todo |
-| M3.3 | Virtual gesture keys + defaults (undo/redo taps) | touch-ux | see below | todo |
-| M3.4 | Pen double-tap → `ToggleEraser` | touch-ux | see below | todo |
-| M3.5 | On-screen modifier bar | touch-ux | see below | todo |
-| M3.6 | Touch-friendly sizing pass | touch-ux | see below | todo |
-| M3.7 | M3 review + tablet checklist | reviewer | see below | todo |
+| M3.1 | Palm rejection + finger-stream state machine in the backend | laf-backend | see below | todo |
+| M3.2 | App side of cancel + touch preferences + finger pan | touch-ux | see below | todo |
+| M3.3 | Two-finger pan + pinch zoom | laf-backend | see below | todo |
+| M3.4 | Virtual gesture keys in laf (double-tap 718, 2/3-finger taps) | laf-backend | see below | todo |
+| M3.5 | Gesture shortcuts + `ToggleEraser` command | touch-ux | see below | todo |
+| M3.6 | On-screen modifier bar (+ Back policy review) | touch-ux | see below | todo |
+| M3.7 | Touch-friendly sizing pass | touch-ux | see below | todo |
+| M3.8 | M3 review + tablet checklist | reviewer | see below | todo |
 
-**M3.1** (ADR 0006 §3,5). Finger contacts ignored while pen active /
-within timeout; `TOOL_TYPE_PALM` dropped; `ACTION_CANCEL` on a pointer
-that holds a button → `KeyDown(kKeyEsc)` + `KeyUp(kKeyEsc)`, then
-`MouseUp` (the loop is cancelled only in `DrawingState::onKeyUp`,
-`drawing_state.cpp:320-330`; `MouseUp` first would commit the stroke);
-no Esc when no button is held (it would close menus / deselect). Preferred
-follow-up: an explicit cancel hook instead of the Esc emulation. Prefs
-"Draw with finger" and "Pen rejection timeout" in `data/pref.xml` +
-Options.
-Accept: tablet: write a word with the palm resting on the screen — no
-stray dots or lines; with "Draw with finger" off, a finger does not
-paint; after a system-cancelled stroke no pixels from the cancelled
-pointer remain and Edit > Undo history has no extra entry for it.
+**M3.1** (ADR 0006 §4). In laf: pen-in-range flag (hover or touch,
+deferred exit), last pen activity time; a finger stream that starts while
+the pen is in range or within the grace period (default 500 ms, from
+`os::TabletOptions` Android field) is ignored to its end; pen arrival
+cancels an active finger stream; `ACTION_CANCEL` with a held button →
+`KeyUp(kKeyPointerCancel)` then `MouseUp` (no Esc KeyDown ever); > 3
+finger pointers (incl. the 8-pointer cap) = palm → cancel + ignore. Host
+unit tests with synthetic sequences modelled on the M0.6 logs (palm
+first, pen first, CANCEL after 0.1 s and 2 s).
+Accept: build: host tests pass. Tablet (with M3.2): write a word with the
+palm resting on the screen — no stray dots or lines, no canvas jumps;
+put the palm down right after lifting the pen — nothing happens.
 
-**M3.2** (ADR 0006 §4). Two pointers → precise `MouseWheel`
-(`PointerType::Touchpad`) for translation and `TouchMagnify` for scale,
-as in `laf/os/osx/view.mm:549,576`; consumed by
-`state_with_wheel_behavior.cpp:71,513`.
-Accept: tablet: two-finger drag pans the canvas smoothly, pinch zooms
-around the fingers, no accidental paint on gesture start.
+**M3.2** (ADR 0006 §4-5, §8 context). `DrawingState::onKeyUp` treats
+`kKeyPointerCancel` like `kKeyEsc` (`src/app/ui/editor/drawing_state.cpp:323`);
+name the scancode in `src/ui/shortcut.cpp` without exposing it in the
+shortcut UI; prefs `touch.draw_with_finger` (default off) and
+`touch.pen_rejection_timeout` (500 ms) in `data/pref.xml` + Options,
+timeout passed via `os::TabletOptions` (`src/app/app.cpp:315`,
+`cmd_options.cpp:1017`); with finger drawing off a one-finger drag on the
+canvas scrolls.
+Accept: tablet: with "Draw with finger" off a finger drag pans and never
+paints; turn it on, make a rectangular selection, start a finger stroke
+inside it and rest the palm until the system cancels — the stroke
+disappears, Edit > Undo History has no entry for it **and the selection
+is still there**.
 
-**M3.3** (ADR 0006 §6). Name `kKeyUnknown1..` slots in
-`src/ui/shortcut.cpp` (and `src/app/app_menus.cpp:230`,
-`src/app/script/keys.cpp:125`), emit them from laf for two/three-finger
-taps, read an `android=` attribute in
-`src/app/ui/keyboard_shortcuts.cpp:47-66`, defaults in `data/gui.xml`.
-Accept: tablet: two-finger tap undoes, three-finger tap redoes; both
-visible and rebindable in Edit > Keyboard Shortcuts.
+**M3.3** (ADR 0006 §7). Clean two-finger stream only (exactly 2
+pointers, not rejected, no CANCEL, movement beyond tap slop) → precise
+`MouseWheel` (`PointerType::Touchpad`) + `TouchMagnify`, as
+`laf/os/osx/view.mm:549,576`; consumed by
+`state_with_wheel_behavior.cpp:71,513`. A third pointer ends the gesture.
+Accept: tablet: two-finger drag pans smoothly, pinch zooms around the
+fingers, no dot on gesture start even with finger drawing on; resting the
+palm never pans.
 
-**M3.4** (ADR 0006 §6-7). Pen double-tap (evdev `KEY_F20`; Android key
-code expected 718, confirm in M0.6) → `PenDoubleTap`, debounced: a burst
-of key-downs within ~100 ms is one gesture, key-ups ignored (one double-tap
-sends two DOWN/UP pairs, NOTES.md §9; otherwise `ToggleEraser` fires twice).
-New `ToggleEraser` command using
-`ActiveToolManager::eraserTipProximity/regularTipProximity`
-(`src/app/tools/active_tool.cpp:151,159`).
-Accept: tablet: double-tap the pen → next stroke erases; double-tap
-again → back to the previous tool (one toggle per double-tap, never two).
-If the probe showed no key event for the double-tap, this task becomes
-"bar button only" and the user is told.
+**M3.4** (ADR 0006 §6). laf `keys.h`: names for `kKeyUnknown1..4`
+(`PenDoubleTap`, `TwoFingerTap`, `ThreeFingerTap`, `PointerCancel`),
+values unchanged. Key 718: first DOWN emits `PenDoubleTap`
+KeyDown+KeyUp; DOWNs within 100 ms of the last, all UPs and repeats are
+dropped (measured pairs 6-16 ms apart). Taps per ADR 0006 §6 (max count
+exactly 2/3, all down within 150 ms, done within 300 ms, ≤ ~24 px
+movement, no CANCEL). Host unit tests.
+Accept: build: host tests incl. a "two pairs 6 ms / 16 ms apart = one
+gesture" and "two double-taps 400 ms apart = two gestures" case. Tablet
+(with M3.5).
 
-**M3.5** On-screen bar (Android-only or pref-gated widget in
+**M3.5** (ADR 0006 §6, §8). App names in `src/ui/shortcut.cpp`,
+`src/app/app_menus.cpp:230`, `src/app/script/keys.cpp:125`;
+`keyboard_shortcuts.cpp:47-66` reads `android=` under `#elif LAF_ANDROID`;
+defaults in `data/gui.xml`: PenDoubleTap → `ToggleEraser`, TwoFingerTap →
+`Undo`, ThreeFingerTap → `Redo`. New `ToggleEraser` command
+(`cmd_toggle_eraser.cpp`, `commands_list.h`, `data/strings/en.ini`)
+switching the selected tool to the eraser and back via
+`ToolBar::selectTool` (pattern `src/app/ui/window_with_hand.cpp:31-59`;
+not `eraserTipProximity()`, which the editor resets on every pen
+message, `editor.cpp:1837-1847`). There is no existing toggle command
+(only the tool key `E`, `data/gui.xml:601`).
+Accept: tablet: double-tap the pen (hovering or away from the screen) →
+toolbar shows the eraser and the next stroke erases; double-tap again →
+previous tool back; 10 double-taps = 10 toggles (never two per tap);
+two-finger tap undoes, three-finger tap redoes; all three visible and
+rebindable in Edit > Keyboard Shortcuts.
+
+**M3.6** On-screen bar (Android-only or pref-gated widget in
 `src/app/ui/`): sticky Shift / Ctrl / Alt / Space, Undo, Redo, Esc, Eraser
-toggle; modifiers fed through `System::keyModifiers()` of the Android
-system so all existing code sees them. Write an ADR on placement before
-coding.
+toggle (`ToggleEraser`, the fallback of ADR 0006 §9); modifiers fed
+through `System::keyModifiers()` of the Android system. Write an ADR on
+placement before coding. Review the Back policy of ADR 0006 §11 with the
+user (deselect on Back when nothing is open: keep or no-op).
 Accept: tablet without keyboard: Shift on + pencil draws straight lines;
-Ctrl on + click picks a layer/colour as on desktop; bar can be hidden.
+Ctrl on + click picks a layer as on desktop; bar can be hidden.
 
-**M3.6** Review hit targets and scale defaults (M1.6) on the tablet; adjust
-default `ui_scale`/`screen_scale`, scrollbar thickness, tab sizes via skin
-theme where needed. Must not change desktop defaults.
+**M3.7** Review hit targets and scale defaults (M1.10 feedback);
+adjust `ui_scale`/`screen_scale` defaults, scrollbar thickness, tab sizes
+via skin theme where needed. Must not change desktop defaults.
 Accept: tablet: all toolbar buttons reliably hit with a finger on the
 first try in a 20-tap test.
 
