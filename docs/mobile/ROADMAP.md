@@ -143,7 +143,7 @@ parallel; M1.4 needs M1.3; M1.8 needs M1.2, M1.6, M1.7.
 | M1.3 | `laf/os/android`: system, ALooper event loop, window, screen, lifecycle | laf-backend | see below | **done** (2026-10-22), laf `da608dc`; review follow-ups in NOTES §6 "laf os/android" |
 | M1.4 | Gradle drives the root CMake; native variants `probe` / `hello_laf` / `aseprite` (ADR 0008 §2-3) | build-engineer | see below | **done** (2026-10-22): probe + hello_laf APKs; hello_laf passed on the tablet (NOTES §6 "M1.4 hello_laf APK on the device") |
 | M1.5 | CPU raster window path, `hello_laf` visible | laf-backend | see below | **done** (2026-10-22), laf `b5f3f25`; verified with the aseprite variant on the tablet |
-| M1.6 | EGL context + Skia GL surface | laf-backend | see below | todo |
+| M1.6 | EGL context + Skia GL surface | laf-backend | see below | implemented (2026-10-22), laf branch `mobile/laf-gpu`; awaiting the tablet check (TEST_CHECKLIST M1.6) |
 | M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | **done** (2026-10-22): 189 files extracted in 17 ms, "data up to date" on relaunch |
 | M1.8 | Aseprite as `libaseprite.so` (`aseprite` variant) | build-engineer | see below | **done** (2026-10-22): Aseprite Home tab on the tablet (NOTES §6 "M1.8 … first run") |
 | M1.9 | Flush preferences + data recovery on background (ADR 0007) | touch-ux | see below | todo |

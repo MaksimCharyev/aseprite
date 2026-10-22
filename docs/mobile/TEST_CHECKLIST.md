@@ -136,3 +136,43 @@ is fine until M1.5. If a step fails, paste
     `adb logcat -d -s laf ActivityManager:I`.
 11. **Dirs.** `adb shell run-as com.github.maksimcharyev.aseprite ls -la` →
     `files` and `cache` exist.
+
+## M1.6 — EGL + Skia GL (`aseprite-hello_laf.apk`, `aseprite-aseprite-gpu.apk`, laf `mobile/laf-gpu`)
+
+Before each run the user clears the log (`adb logcat -c`). Collect with
+`adb logcat -d -s laf:V Aseprite:V AndroidRuntime:E DEBUG:F libEGL:V`.
+Count lines with
+`adb logcat -d -s laf | grep -cE "Using OpenGL backend \(GrDirectContext"`.
+
+1. **hello_laf, GPU default.** Install, launch. Expected once:
+   `GL: GPU acceleration on`, `GL: EGL 1.4 (…), surfaceless_context=1`,
+   `GL: EGLContext created (OpenGL ES 3)`, `GL: EGLSurface #1 created
+   (2800x1840)`, `OS: Using OpenGL backend (GrDirectContext #1, Maleoon
+   920A, OpenGL ES 3.2 …)`, `GL: first frame on EGLSurface #1 …`. The
+   picture is the same as with M1.5 (red/green/blue lines, red is red).
+   No `Raster:` lines, no `failed (EGL error …)`.
+2. **Rotate ×5.** Picture follows the rotation; `Window resized: …`
+   only; **no** new `EGLSurface #` and no second `Using OpenGL backend`.
+3. **Home → back ×5, power off/on ×5.** Each cycle: `GL: EGLSurface #N
+   destroyed` after `APP_CMD_TERM_WINDOW`, `GL: EGLSurface #N+1 created`
+   after `Window attached`, then `GL: first frame on EGLSurface #N+1`.
+   Still exactly **one** `Using OpenGL backend` and one `EGLContext
+   created`; no black screen.
+4. **Raster override.** `adb shell setprop debug.laf.gpu 0`, swipe the app
+   away, relaunch: `GL: debug.laf.gpu=0`, `Raster: using the raster
+   backend for this window (GPU acceleration off)`, picture OK, no
+   `EGLSurface` lines. Then `adb shell setprop debug.laf.gpu ""`.
+5. **Aseprite, app default (pref false).** `aseprite-aseprite-gpu.apk`:
+   `GL: GPU acceleration on` (laf default, window creation) followed by
+   `GL: GPU acceleration off` (Aseprite's pref) and the `Raster:` line; if
+   `INIT_WINDOW` came before the window, an `EGLContext created`/
+   `EGLSurface #1 created`/`destroyed` pair may appear in between (no
+   `Using OpenGL backend`). The UI works as in M1.8.
+6. **Aseprite, GPU forced.** `adb shell setprop debug.laf.gpu 1`, swipe
+   away, relaunch: steps 1–3 expectations (Home tab instead of lines);
+   open a sprite and draw with a finger/pen; open menus. Paste the log.
+7. **Frame stats (optional).** `adb shell setprop debug.laf.verbose 1`,
+   relaunch, scroll/draw for 10 s: `GL: N frames in 2.0 s (F fps),
+   flush+swap avg A ms max M ms` lines (frames = frames the app drew, not
+   the display rate). Reset `debug.laf.verbose 0` and `debug.laf.gpu ""`
+   afterwards.
