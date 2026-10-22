@@ -64,6 +64,16 @@ Preferences::Preferences() : app::gen::GlobalPref("")
     experimental.useNativeFileDialog.setDefaultValue(false);
 #endif
 
+#if LAF_ANDROID
+  // Defaults for tablets (e.g. 2800x1840 at 400 dpi): a bigger screen
+  // scale than the desktop one (2), so the UI has about the same
+  // physical size as on a 92 dpi monitor. These are only defaults, a
+  // value saved in the configuration file is kept.
+  general.screenScale.setDefaultValue(3);
+  general.uiScale.setDefaultValue(1);
+  experimental.useNativeFileDialog.setDefaultValue(false);
+#endif
+
   load();
 
   // Create a connection with the default document preferences grid
