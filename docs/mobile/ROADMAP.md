@@ -144,8 +144,8 @@ parallel; M1.4 needs M1.3; M1.8 needs M1.2, M1.6, M1.7.
 | M1.4 | Gradle drives the root CMake; native variants `probe` / `hello_laf` / `aseprite` (ADR 0008 §2-3) | build-engineer | see below | **done** (2026-10-22): probe + hello_laf APKs; hello_laf passed on the tablet (NOTES §6 "M1.4 hello_laf APK on the device") |
 | M1.5 | CPU raster window path, `hello_laf` visible | laf-backend | see below | todo |
 | M1.6 | EGL context + Skia GL surface | laf-backend | see below | todo |
-| M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | todo |
-| M1.8 | Aseprite as `libaseprite.so` (`aseprite` variant) | build-engineer | see below | todo |
+| M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | build done (2026-10-22, branch `mobile/m1-aseprite-so`); tablet check pending |
+| M1.8 | Aseprite as `libaseprite.so` (`aseprite` variant) | build-engineer | see below | links, APK built (2026-10-22); window needs M1.5/M1.6, tablet check pending |
 | M1.9 | Flush preferences + data recovery on background (ADR 0007) | touch-ux | see below | todo |
 | M1.10 | First-run defaults for Android | touch-ux | see below | todo |
 | M1.11 | M1 review + tablet checklist | reviewer | see below | todo |

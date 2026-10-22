@@ -607,6 +607,65 @@ Branch `mobile/m1-gradle-native`. Wrapper `android/app/src/main/cpp/CMakeLists.t
   7.0 MB (hello_laf); APKs 8.0 / 14.5 MB (the latter two include `data/`).
 - Desktop root configure unchanged (not touched: only `android/` files changed).
 
+### Assets and `libaseprite.so` (M1.7 + M1.8, 2026-10-22, branch `mobile/m1-aseprite-so`)
+
+- **Assets.** Gradle task `GenerateDataAssets` (`android/app/build.gradle`,
+  registered per variant via `androidComponents.onVariants` +
+  `sources.assets.addGeneratedSourceDirectory`) copies `data/` + the
+  `copy_data` extras into `assets/data/` and writes `assets/data.manifest`
+  (`sha256 <hash>` line, then relative paths; hash over path, size and
+  bytes). The AGP default `ignoreAssetsPattern` is spelled out
+  (`!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~`)
+  and mirrored in `AssetsFilter` so the manifest equals the packaged files
+  (checked: 189 manifest entries == 189 `assets/data/*` zip entries).
+  `strings.git` (network) is not shipped. Data is 1.3 MB, 189 files.
+- **Extractor** `src/main/android_assets.cpp` (`os::android_pre_main`, part of
+  the `aseprite` SHARED target, not of app-lib). Compares the manifest header
+  with `<filesDir>/aseprite/data/.stamp`; otherwise extracts into
+  `aseprite/data.new/`, writes the stamp last, then replaces `data/` (an
+  interrupted run never leaves a valid stamp). Logs tag `Aseprite`.
+  `llvm-nm -D`: `_ZN2os16android_pre_mainEP11android_app` is `W` with a
+  non-zero address, i.e. a weak *definition* (the declaration in laf is
+  weak), not an undefined reference.
+- **ResourceFinder analysis.** Android is neither `_WIN32` nor `__APPLE__`, so
+  `ResourceFinder::includeDataDir()` takes the Linux branch: first
+  `$XDG_CONFIG_HOME/aseprite/data/<f>` = `<filesDir>/aseprite/data/<f>`
+  (laf's `setupEnvironment()` sets HOME and XDG_CONFIG_HOME to
+  `internalDataPath`, the same string the extractor uses), then
+  `$BINDIR/data` where `get_app_path()` = readlink `/proc/self/exe` =
+  `/system/bin/app_process64` (never matches, harmless). `includeUserDir()` also
+  goes through `XDG_CONFIG_HOME` -> `<filesDir>/aseprite/aseprite.ini`.
+  Other `get_app_path()` users: `App` portable-mode check
+  (`app.cpp:705`, looks for `aseprite.ini` next to app_process64, false),
+  Sentry/Steam/Windows code (off). **No ResourceFinder change needed**
+  (ADR 0002 §3 confirmed).
+- **`get_user_docs_folder()`** (`laf/base/fs_unix.h:199`) returns `$HOME` =
+  `filesDir` on Android, which works but is not reachable by `adb push`
+  without `run-as`. The external dir needs a laf change (not applied): in
+  `laf/os/android/app.cpp::setupEnvironment()` also
+  `setenv("LAF_ANDROID_EXTERNAL_FILES", activity->externalDataPath, 1)` and
+  in `fs_unix.h` `#if LAF_ANDROID` return it from `get_user_docs_folder()`
+  when set (base must not depend on os, hence the env var). Used by the file
+  selector start folder, `app.fs.userDocsPath` and the FileSystem root.
+- **Link.** `src/CMakeLists.txt`: `if(ANDROID) add_library(aseprite SHARED
+  main/main.cpp main/android_assets.cpp)`; `install()` skipped on Android.
+  It linked at the first attempt (the weak hook and `--no-undefined` are
+  fine); NEEDED: libGLESv2, libEGL, liblog, libandroid, libdl/libm/libc only.
+  `libaseprite.so` 28.9 MB (RelWithDebInfo, stripped by AGP), exports
+  `android_main`, `GameActivity_onCreate`,
+  `Java_com_google_androidgamesdk_GameActivity_initializeNativeCode`.
+  APK 36.5 MB, no INTERNET, `native-code: arm64-v8a`.
+- **Startup path (logic only, D5):** GameActivity -> laf `android_main` ->
+  env, input, `android_pre_main` (extract) -> `app_main("laf")` ->
+  `os::System::make()` -> `App::initialize`. Risks to watch on the tablet:
+  an exception in `app_main` is rethrown (terminate -> `F DEBUG`); stderr
+  `LOG()` output does not reach logcat; black window until M1.5/M1.6.
+- Gotcha: after deleting `.cxx` an incremental `packageDebug` produced a
+  65 MB APK with ~29 MB of dead zip space; deleting
+  `android/app/build/outputs/apk` and repackaging gives 36.5 MB.
+- Build times (this laptop): clean native `aseprite` 4m35s, repackage 3 s;
+  desktop `LAF_BACKEND=none` `ninja aseprite` 5m (unchanged, still builds).
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |
