@@ -666,6 +666,62 @@ Branch `mobile/m1-gradle-native`. Wrapper `android/app/src/main/cpp/CMakeLists.t
 - Build times (this laptop): clean native `aseprite` 4m35s, repackage 3 s;
   desktop `LAF_BACKEND=none` `ninja aseprite` 5m (unchanged, still builds).
 
+### First-run defaults, safe area, launcher icon (M1.10, 2026-10-22, branch `mobile/m1-defaults`)
+
+laf branch `mobile/laf-insets` (from `9f5524a`), only `os/android/`.
+
+- **Defaults.** `src/app/pref/preferences.cpp`, `#if LAF_ANDROID` before
+  `load()`: `general.screenScale.setDefaultValue(3)`, `uiScale` 1,
+  `experimental.useNativeFileDialog` false. `setDefaultValue()` only changes
+  the default (`load_option()` uses it when the key is missing), so a saved
+  value always wins. Caveat: `gui.cpp:162` writes the scale on the first
+  run, so an install that already ran keeps 2 until the app data is
+  cleared / the app is uninstalled. `gpu_acceleration=true` from the
+  roadmap is **not** set: it waits for M1.6 (EGL), otherwise the switch
+  would point at a GL path that doesn't exist yet. `multiple_windows` is
+  already false in `pref.xml`.
+- **Safe area API.** `os::android_safe_area_insets()` in
+  `os/android/android_app.h` → `gfx::Border` in window pixels. No change to
+  the cross-platform `os::Window` (merge-friendly with M1.6, which edits
+  `os/skia`). Computed in `AppAndroid::refreshSafeArea()`
+  (`os/android/app.cpp`) per side as the max of
+  `ceil(r * (1 - 1/sqrt(2)))` of the two corners on that side, the display
+  cutout and the waterfall insets (`GameActivity_getWindowInsets()`, no JNI).
+  Corner radius `r`: (1) `Display.getRoundedCorner(pos).getRadius()` (API 31,
+  via `Activity.getDisplay()`, ids cached in `initRoundedCornersJni()`,
+  `jni_exception_check()` after every call; rotation-aware); (2) if all four
+  are 0, the Huawei property `ro.config.fillet_radius_size` in dp;
+  (3) override `debug.laf.corner_radius` (px, `-1` = automatic, `0` = none).
+  Refreshed at startup, `INIT_WINDOW`, `WINDOW_RESIZED`,
+  `CONTENT_RECT_CHANGED`, `CONFIG_CHANGED` (before the window resize event)
+  and `WINDOW_INSETS_CHANGED`; if only the insets changed, a resize event is
+  sent (`requestRedraw()`) so the app re-lays out. Logged as
+  `<reason>: safe area insets=(l t r b) px, corner radii=… from <source>, cutout=… waterfall=…`
+  whenever it changes (always once at startup).
+- **App side.** `MainWindow` (desktop window, `src/app/ui/main_window.cpp`)
+  sets its border to the insets divided by the screen scale (rounded up) in
+  `onInitTheme()` (after `noBorderNoChildSpacing()`) and at the start of
+  `onResize()` (before the children are laid out), `#if LAF_ANDROID`. The
+  border strip is painted with the window background colour. Popups/dialogs
+  are not constrained (they are centred, far from the corners).
+- **Grey Home links: not a bug.** The Home tab links use style
+  `workspace_link` = colour `workspace_link` `#655561` (dark mauve) on
+  `workspace` `#7d929e` (`data/extensions/aseprite-theme/theme.xml:87-90`);
+  the logo is the theme's own face icon. Screenshot pixels: links `#61555f`,
+  workspace `#81919d`, white/black exact — a uniform ±4 shift that is the
+  device's display colour transform in `screencap`, not alpha blending
+  (blending would pull the links towards the workspace colour). The window
+  and screen colour spaces are sRGB (`os/android/window.cpp`, `screen.cpp`).
+  Same look as desktop Aseprite with the default theme.
+- **Launcher icon.** `android/app/src/main/res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.png`
+  (48/72/96/144/192 px) from `data/icons/hd/asehd.png` (512 px, smooth
+  version; the `ase*.png` set is pixel art without the shadow):
+  `magick data/icons/hd/asehd.png -filter Lanczos -resize NxN -strip PNG32:…`.
+  Legacy (non-adaptive) icon: the artwork already has its own rounded
+  square and shadow, an adaptive mask would put it on a second tile.
+  Manifest `android:icon="@mipmap/ic_launcher"`. `versionCode 3`,
+  `versionName 0.0.4-m1-<variant>`.
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |
@@ -719,6 +775,7 @@ Collected with read-only `adb` (`getprop`, `dumpsys display|input|SurfaceFlinger
 | EGL | 1.4, has `EGL_KHR_partial_update`, `EGL_KHR_swap_buffers_with_damage`, `EGL_ANDROID_presentation_time`, `EGL_KHR_surfaceless_context` |
 | Display | 1840×2800 native (portrait), used landscape 2800×1840; density **400** (scale 2.5), 270×276 dpi |
 | Refresh | modes 30 / 60 / 90 / 120 / 144 Hz; default mode 60 Hz; active mode was 120 Hz at capture time (adaptive) |
+| Rounded corners | visibly rounded panel corners, but `dumpsys window` reports `mRoundedCorners` radius=0 for all four (so `Display.getRoundedCorner()` gives 0) and an empty `DisplayCutout`; Huawei props: `ro.config.fillet_radius_size=11` (dp → 28 px, matches the clipped "F" in the M1.8 screenshot), `hw_mc.pad.landscape.notch_area=240,34,1340,0`, `hw_sc.window_corner_config=2,2,2.0,1.1` (2026-10-22, M1.10) |
 
 ### Input devices
 

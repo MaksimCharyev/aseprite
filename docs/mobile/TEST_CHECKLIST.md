@@ -136,3 +136,48 @@ is fine until M1.5. If a step fails, paste
     `adb logcat -d -s laf ActivityManager:I`.
 11. **Dirs.** `adb shell run-as com.github.maksimcharyev.aseprite ls -la` →
     `files` and `cache` exist.
+
+## M1 — Aseprite first-run defaults (`0.0.4-m1-aseprite`, M1.10, branch mobile/m1-defaults)
+
+APK: `build/apk/aseprite-aseprite.apk`. The defaults apply only when the
+configuration file has no saved value, and the first run of `0.0.3`
+already saved `screen_scale=2`, so **uninstall first** (this also removes
+`aseprite.ini`):
+
+    adb uninstall com.github.maksimcharyev.aseprite
+    adb install build/apk/aseprite-aseprite.apk
+    adb logcat -c
+    adb logcat -v time -s Aseprite:V laf:V AndroidRuntime:E DEBUG:V libc:F
+
+1. **Launcher icon.** The launcher shows the Aseprite face icon (white
+   square, two eyes, blue-grey bottom), label "Aseprite"; not the generic
+   Android robot.
+2. **Scale.** Launch. UI is ~1.5× bigger than in `0.0.3` (menu text about
+   as big as on a desktop monitor). Edit > Preferences > General: Screen
+   Scaling 300%, UI Elements Scaling 100%. Log: `Window attached: 2800x1840`.
+3. **Safe area.** Log has one line
+   `startup: safe area insets=(9 9 9 9) px, corner radii=(28 28 28 28) px from ro.config.fillet_radius_size, cutout=(0 0 0 0) waterfall=(0 0 0 0)`
+   (HarmonyOS reports radius 0 through `Display.getRoundedCorner()`, so the
+   Huawei property `ro.config.fillet_radius_size=11` dp is used). On screen:
+   a 3-UI-pixel (9 px) strip of window colour around the whole UI; the "F"
+   of "File" and the bottom status line are fully visible in all four
+   corners, nothing is clipped by the rounded corners.
+4. **Radius not right?** If something is still clipped (or the margin
+   is too big), try other radii in pixels, e.g.
+   `adb shell setprop debug.laf.corner_radius 60`, swipe the app away from
+   Recents, relaunch; the log then says `from debug.laf.corner_radius` and
+   the margin is `ceil(60 × 0.293) = 18` px. Report the smallest value
+   where nothing is clipped, then `adb shell setprop debug.laf.corner_radius -1`
+   to go back to the automatic value.
+5. **Rotate ×3** (portrait/landscape). The margin stays on all four
+   sides, the layout fills the new size; no `JNI: exception`/`FATAL` in
+   the log.
+6. **Change screen scale.** Preferences > Screen Scaling 200% > OK. The
+   margin becomes 5 UI px (still 9-10 physical px) and the UI shrinks. Set
+   300% back. Swipe the app away and relaunch: the chosen value is kept
+   (saved values win over the Android default).
+7. **Scale comparison (feeds M3.7).** Try 300%/100%, 200%/100% and
+   200%/200% (Screen / UI Elements scaling) and report which one is the
+   most comfortable with finger and pen.
+8. **No CheckJNI errors.** `adb logcat -d | grep -E "JNI DETECTED|JNI: exception|FATAL"`
+   → empty.

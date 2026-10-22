@@ -147,7 +147,7 @@ parallel; M1.4 needs M1.3; M1.8 needs M1.2, M1.6, M1.7.
 | M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | **done** (2026-10-22): 189 files extracted in 17 ms, "data up to date" on relaunch |
 | M1.8 | Aseprite as `libaseprite.so` (`aseprite` variant) | build-engineer | see below | **done** (2026-10-22): Aseprite Home tab on the tablet (NOTES §6 "M1.8 … first run") |
 | M1.9 | Flush preferences + data recovery on background (ADR 0007) | touch-ux | see below | todo |
-| M1.10 | First-run defaults for Android | touch-ux | see below | todo |
+| M1.10 | First-run defaults for Android | touch-ux | see below | **code done** (2026-10-22), `mobile/m1-defaults` + laf `mobile/laf-insets`: screen scale 3, safe area for rounded corners, launcher icon (NOTES §6 "First-run defaults"); awaiting tablet test, `gpu_acceleration` left for M1.6 |
 | M1.11 | M1 review + tablet checklist | reviewer | see below | todo |
 
 **M1.1 Host `gen`** (ADR 0008 §1). New `android/scripts/build-host-gen.sh`:
