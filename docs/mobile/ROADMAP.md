@@ -24,6 +24,30 @@ adb logcat -c && adb logcat -v time -s Aseprite:V AsepriteProbe:V laf:V AndroidR
 
 ---
 
+## Next session (planned 2026-10-22)
+
+State: Aseprite runs on the tablet and the user draws with the pen
+(branch `mobile/m2-input`, laf `mobile/laf-input`, both pushed). GPU path
+M1.6 is done but not merged (branch `mobile/m1-gpu` + laf `mobile/laf-gpu`,
+worktree `/home/max/Projects/src/aseprite-m16`).
+
+Run in parallel (separate worktrees so laf edits/builds don't collide):
+1. **Smoothness** (laf-backend): merge laf `mobile/laf-gpu` into
+   `mobile/laf-input`, default `general.gpu_acceleration=true` on Android
+   (`src/app/pref/preferences.cpp`), request 144 Hz (fallback 120) with
+   `ANativeWindow_setFrameRate()` / preferred display mode — the panel
+   drops to 60 Hz today (NOTES §6 "M2.1/M2.2 + M1.10 on the device").
+   Tablet: TEST_CHECKLIST "M1.6", `dumpsys display` shows 120/144 Hz while
+   drawing.
+2. **Gestures** (touch-ux + laf-backend): M3.3 two-finger pan + pinch zoom
+   (user's first request), M3.4/M3.5 two-finger tap undo, three-finger tap
+   redo, pen double-tap (keyCode 718, debounce) → new `ToggleEraser`,
+   M3.1/M3.2 palm `ACTION_CANCEL` discards the stroke without an undo entry.
+
+Still open: M1.9 background flush (ADR 0007), M1.11 review, M2.3 hardware
+keyboard, M2.4 soft keyboard/IME, review follow-ups for the asset
+extractor (fsync, `fs::exists` error_code, clang-format line 35).
+
 ## M0 — Toolchain and probes
 
 Goal: everything cross-compiles for `arm64-v8a`, an APK installs, and we
