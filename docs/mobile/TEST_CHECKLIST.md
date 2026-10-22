@@ -319,3 +319,63 @@ the log (`adb logcat -c`). Collect with
 6. **Frame stats (optional).** `adb shell setprop debug.laf.verbose 1`,
    relaunch, draw for 10 s: `GL: N frames in 2.0 s (F fps), …` — F close
    to the refresh rate while the stroke moves. Reset `debug.laf.verbose 0`.
+
+## M3 — files (system picker), keyboard, soft keyboard (branch mobile/m3-files, ADR 0009)
+
+Install `build/apk/aseprite-aseprite.apk` with `adb install -r`. If
+Aseprite ran before, check Edit > Preferences > Experimental > "Use
+native file dialog" is **on** (a value saved earlier wins over the new
+default). Capture for every step:
+
+    adb shell setprop debug.laf.verbose 1    # then restart the app
+    adb logcat -v time -s laf:V AndroidRuntime:E DEBUG:V libc:F
+
+1. **Save As → system picker.** New sprite, draw, File > Save As.
+   Expected: the system file picker opens with the name
+   `Sprite-0001.aseprite`; choose Download (or Pictures), type a name
+   with the Magnetic Keyboard, Save. Aseprite returns, the tab shows the
+   typed name, no error. The file is in the Files app at the chosen
+   place with a non-zero size.
+   Logcat: `documents: request 1: showing the save picker (name="Sprite-0001.aseprite" …)`,
+   `APP_CMD_PAUSE`, `APP_CMD_TERM_WINDOW` … `APP_CMD_RESUME`,
+   `APP_CMD_INIT_WINDOW`, `documents: request 1: result 1 with 1 document(s)`,
+   `documents: content://… -> …/cache/documents/<hash>/<name>.aseprite`,
+   `documents: saved … -> content://… in N ms`.
+2. **Name without extension.** Save As again, type `test2` (no
+   extension). Expected: the file in Files is `test2.aseprite`
+   (`documents: renamed to "test2.aseprite"`), or, if the provider
+   refuses the rename, `test2` with Aseprite data (report which).
+3. **Export PNG.** File > Export As > browse "…" → picker, type
+   `test.png`. Expected: `test.png` in Files, opens in Gallery.
+4. **Save overwrites.** Draw more, Ctrl+S (or File > Save). Expected: no
+   picker, `documents: saved … -> content://…` again; the file in Files
+   has the new content (open it in the Gallery for a PNG, or re-open it
+   in Aseprite after closing the tab).
+5. **Open.** Close the tab, File > Open → picker → pick the file from
+   step 1. Expected: it opens with its name; logcat
+   `documents: content://… -> …` (no "cannot read").
+   Also open a PNG from Download/Gallery, edit, Save → the PNG in
+   Download is updated.
+6. **Recent after restart.** Swipe Aseprite away, start it, open the
+   file from the Home tab's recent list. Expected: it opens;
+   `documents: refreshed … <- content://…`. Edit + Save → updated in
+   Files (persisted permission).
+7. **Cancel.** File > Open, press Back in the picker. Expected: nothing
+   happens, `result 0`, Aseprite still responsive.
+8. **Hardware keyboard.** With the Magnetic Keyboard: `B` selects the
+   brush, `E` the eraser, Ctrl+Z undoes, Ctrl+Y / Ctrl+Shift+Z redoes,
+   hold Space + drag pans, Shift+click draws a line, Tab hides panels.
+   File > New: type width/height digits in the fields, Enter = OK.
+   Back key/gesture closes an open menu or dialog (never exits).
+   Volume keys still change the volume.
+   Verbose logcat per key: `input: key DOWN keyCode=30 … -> KeyDown scancode=2 unicode=0x62 …`.
+   Startup: `startup: keyboard=2 keysHidden=1 (hardware keyboard attached)`.
+9. **Soft keyboard** (detach the Magnetic Keyboard first; logcat shows
+   `APP_CMD_CONFIG_CHANGED: keyboard=1 … not attached`). Sprite >
+   Properties (or a layer rename): tap the name field → the on-screen
+   keyboard opens (`input: text input on, showing the soft keyboard`);
+   type Latin and Cyrillic, Backspace, Done/Enter confirms; the
+   keyboard hides when the dialog closes
+   (`input: text input off, hiding the soft keyboard`). Opening a
+   dialog without tapping a field must **not** open the keyboard.
+   Report if characters appear twice or Backspace deletes two.

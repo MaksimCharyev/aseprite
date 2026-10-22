@@ -344,6 +344,9 @@ private:
   void prepareForSequence();
   void makeAbstractImage();
   void makeDirectories();
+#if LAF_ANDROID
+  bool saveToAndroidDocument();
+#endif
 };
 
 // Available extensions for each load/save operation.

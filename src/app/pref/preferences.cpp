@@ -71,7 +71,10 @@ Preferences::Preferences() : app::gen::GlobalPref("")
   // value saved in the configuration file is kept.
   general.screenScale.setDefaultValue(3);
   general.uiScale.setDefaultValue(1);
-  experimental.useNativeFileDialog.setDefaultValue(false);
+  // The native file dialog is the system document picker (Storage
+  // Access Framework), the only way to reach shared folders without
+  // storage permissions.
+  experimental.useNativeFileDialog.setDefaultValue(true);
   // Skia GL over EGL: the raster path copies every frame with the CPU
   // and the panel stays at 60 Hz with it.
   general.gpuAcceleration.setDefaultValue(true);
