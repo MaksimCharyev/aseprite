@@ -114,7 +114,7 @@ ADR 0003 section 5, `ENABLE_TESTS=OFF`, `LAF_WITH_EXAMPLES=OFF`. Results
 (`build/android/lib/lib*.a`) and the known `app-lib` blockers: NOTES.md
 section 6, "Root project cross-build".
 
-## M0.5 Build the APK (Gradle skeleton)
+## M0.5 / M1.4 Build the APK (Gradle)
 
 ```
 source android/scripts/env.sh
@@ -135,13 +135,48 @@ compileSdk 35, targetSdk 34, minSdk 29, NDK r26b, SDK CMake 3.31.6,
   (created by AGP on first build, inside the already-listed `~/.android`).
 - `data/` is packaged into APK `assets/` by Gradle (`sourceSets.main.assets`
   points at `../../data`), no copy step.
-- The native part is a separate small CMake project in
-  `android/app/src/main/cpp` (a stub `android_main` that logs and clears the
-  window); the Aseprite root CMake is wired in at M1.
+- The native part is driven by the wrapper
+  `android/app/src/main/cpp/CMakeLists.txt`, see "M1.4 Native variants" below.
 - Build outputs are git-ignored (`android/.gitignore`): `android/.gradle`,
   `android/build`, `android/app/build`, `android/app/.cxx`,
   `local.properties`. `ANDROID_HOME` comes from env.sh, no `local.properties`
   is needed.
+
+### M1.4 Native variants
+
+`-PnativeTarget=<variant>` selects what becomes `libaseprite.so` (the library
+`AsepriteActivity` loads); the default is `probe`:
+
+| variant | what | needs |
+|---------|------|-------|
+| `probe` | M0.6 input probe stub (`cpp/main.cpp`), Java key/hover logging on | nothing else |
+| `hello_laf` | `laf/examples/hello_laf.cpp` on the laf Android backend (laf only, not the whole tree) | Skia (`SKIA_DIR`) |
+| `aseprite` | root Aseprite project (`add_subdirectory(<repo>)`); **does not link yet** (M1.8): all libraries build, the final `bin/aseprite` executable fails with `undefined symbol: main` | Skia, host `gen` |
+
+```
+source android/scripts/env.sh
+android/scripts/build-apk.sh hello_laf        # or probe / aseprite
+# equivalent: cd android && ./gradlew :app:assembleDebug -PnativeTarget=hello_laf
+```
+
+- The APK is `android/app/build/outputs/apk/debug/app-debug.apk` (one build
+  overwrites the other); `build-apk.sh` also copies it to
+  `build/apk/aseprite-<variant>.apk` (git-ignored) so both can be kept and
+  installed: `adb install -r build/apk/aseprite-hello_laf.apk`.
+- `versionName` is `0.0.3-m1-<variant>`
+  (`adb shell dumpsys package com.github.maksimcharyev.aseprite | grep versionName`).
+- Skia comes from `SKIA_DIR` (env, default `~/deps/skia-m124-android`) or
+  `-PskiaDir=...`. For `aseprite` Gradle first runs `android/scripts/build-host-gen.sh`
+  (task `buildHostGen`, host `gen` as `GEN_EXE`).
+- The native build type is forced to `RelWithDebInfo` by the wrapper (the
+  debug APK would otherwise be `-O0`); the APK stays `debuggable`. Unstripped
+  libraries: `android/app/build/intermediates/cxx/Debug/*/obj/arm64-v8a/`.
+- Changing the variant reconfigures CMake (a separate `.cxx/Debug/<hash>` tree
+  per variant, so switching back is cheap). Gradle build time on this laptop
+  (clean `app/.cxx` + `app/build`): `probe` ~4 s, `hello_laf` ~11 s,
+  `aseprite` ~4 min until the failing final link.
+- Logs: `adb logcat -s laf:V AsepriteProbe:V` (`AsepriteProbe` is only
+  written by the `probe` variant).
 
 Inspect the result:
 

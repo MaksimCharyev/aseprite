@@ -580,6 +580,33 @@ reverted.
    to the system; update ADR 0006 §11 (architect).
 6. TMPDIR fallback dir isn't created → `mkdir` it.
 
+### Gradle drives the root CMake (M1.4, 2026-10-22)
+
+Branch `mobile/m1-gradle-native`. Wrapper `android/app/src/main/cpp/CMakeLists.txt`
+(variants `probe` / `hello_laf` / `aseprite`, see BUILDING.md).
+
+- `find_package(game-activity REQUIRED CONFIG)` before `add_subdirectory`
+  works as planned; `-DCMAKE_BUILD_TYPE=Debug` from AGP wins over
+  `arguments`, so the wrapper forces `RelWithDebInfo` with
+  `set(CMAKE_BUILD_TYPE ... CACHE STRING "" FORCE)` before `project()`.
+- AGP only accepts CMake target names it can see: `targets 'aseprite'` for
+  `probe` (the stub library is named `aseprite`), `hello_laf` for the laf
+  example (renamed with `OUTPUT_NAME aseprite`, AGP packages
+  `lib/arm64-v8a/libaseprite.so` fine), `aseprite` for the app. `targets` also
+  stops AGP building everything (`laf-examples` etc.).
+- `hello_laf` is `add_subdirectory(laf)` only: no `gen`, no app-lib, 11 s.
+  `aseprite` is `add_subdirectory(<repo>)`: configure ok, 1300+ objects
+  compile with the NDK, link of `bin/aseprite` fails with `undefined symbol:
+  main` (root `src/CMakeLists.txt` still makes an executable; M1.8).
+- The host `gen` Gradle task only runs for the `aseprite` variant (the other
+  two generate nothing); it is wired to `preBuild` and `configureCMake*`.
+- The default `nativeTarget` is `probe`; both `probe` and `hello_laf` APKs
+  have no `INTERNET` permission, `native-code: arm64-v8a`.
+- `llvm-nm -D` of both: `android_main`, `Java_com_google_androidgamesdk_GameActivity_initializeNativeCode`,
+  `GameActivity_onCreate` exported. `libaseprite.so` 0.45 MB (probe),
+  7.0 MB (hello_laf); APKs 8.0 / 14.5 MB (the latter two include `data/`).
+- Desktop root configure unchanged (not touched: only `android/` files changed).
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |
@@ -757,3 +784,32 @@ follow the step order exactly, so steps were identified from the events.
 - One-, two-, three-finger taps and pinch arrive as expected
   (`POINTER_DOWN/UP`, up to 8 pointers during palm contact).
 - Hardware keyboard: "HUAWEI Magnetic Keyboard" (id 125) is also visible.
+
+### M1.4 hello_laf APK on the device (2026-10-22)
+
+`aseprite-hello_laf.apk` (`0.0.3-m1-hello_laf`) installed by the user;
+`logcat -s laf` read by the main session. Result: **passed** — no crash,
+no AndroidRuntime/DEBUG lines; black screen as expected before M1.5.
+
+- Startup: `android_main: start (sdk 31)`, density 400, HOME/XDG_CONFIG_HOME
+  = `/data/user/0/com.github.maksimcharyev.aseprite/files`, TMPDIR = `…/cache`
+  (JNI `getCacheDir()` works from the glue thread), input filters installed,
+  `app_main()` called. The window is created **before** `INIT_WINDOW` with
+  the dp-derived size 2800×1760 (navigation inset excluded), then attached
+  at the real 2800×1840 — the "created before INIT" path works.
+- Rotation ×6: `CONFIG_CHANGED` + `Window resized` 1840×2800 ↔ 2800×1840.
+  **But `AConfiguration` stays stale**: `orientation=2` and
+  `screen=1120x704dp` never change, even after `AConfiguration_fromAssetManager`.
+  Don't use `AConfiguration` orientation/screen dp after startup; the
+  `ANativeWindow` size is the truth (density is constant anyway).
+- Home / power ×4: `PAUSE → TERM_WINDOW → Window detached → STOP →
+  SAVE_STATE`, then `START → RESUME → INIT_WINDOW → Window attached`.
+- The user also triggered a HarmonyOS floating/split window (12:41:16):
+  `TERM_WINDOW` + `INIT_WINDOW: window 935x1868` without PAUSE, then back to
+  2800×1840 via `CONFIG_CHANGED` + resize. Handled without crash — the app
+  must cope with arbitrary window sizes (multi-window).
+- Back: the app stays open (key goes to native, ignored). Volume keys show
+  the system volume panel (filter passes them to the system).
+- Swipe from Recents: process killed ("remove task"), as in M0.5.
+- Not checked this run: idle CPU in background (the app was swiped away
+  before `top` ran) and the verbose input log — re-check with the next APK.

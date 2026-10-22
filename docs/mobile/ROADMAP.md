@@ -141,7 +141,7 @@ parallel; M1.4 needs M1.3; M1.8 needs M1.2, M1.6, M1.7.
 | M1.1 | Host-built `gen` for cross-compiling (ADR 0008 §1) | build-engineer | see below | **done** (2026-10-22), `mobile/m1-host-gen` |
 | M1.2 | `app-lib` compiles for Android | build-engineer | see below | **done** (2026-10-22), `mobile/m1-app-lib` |
 | M1.3 | `laf/os/android`: system, ALooper event loop, window, screen, lifecycle | laf-backend | see below | **done** (2026-10-22), laf `da608dc`; review follow-ups in NOTES §6 "laf os/android" |
-| M1.4 | Gradle drives the root CMake; native variants `probe` / `hello_laf` / `aseprite` (ADR 0008 §2-3) | build-engineer | see below | todo |
+| M1.4 | Gradle drives the root CMake; native variants `probe` / `hello_laf` / `aseprite` (ADR 0008 §2-3) | build-engineer | see below | **done** (2026-10-22): probe + hello_laf APKs; hello_laf passed on the tablet (NOTES §6 "M1.4 hello_laf APK on the device") |
 | M1.5 | CPU raster window path, `hello_laf` visible | laf-backend | see below | todo |
 | M1.6 | EGL context + Skia GL surface | laf-backend | see below | todo |
 | M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | todo |
