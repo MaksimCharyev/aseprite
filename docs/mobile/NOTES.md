@@ -387,6 +387,31 @@ not fixed, input for M1): stops early on two classes of errors.
    for `user_agent`. Fix options: expose the two fields on Android in
    `laf/base/platform.h`, or guard the distro lines in `user_agent.cpp`.
 
+### Gradle skeleton (M0.5, 2026-10-22)
+
+- Versions: Gradle 8.14.6, AGP 8.13.2 (latest stable 8.x). AGP 9.4.1 is the
+  latest stable but requires build-tools 36 and Gradle 9.6; AGP 9.5 is still
+  RC. Revisit when moving to compileSdk 36.
+- `androidx.games:games-activity` 4.4.2 is the current release on Google
+  Maven (checked 2026-10-22). `GameActivity` extends `AppCompatActivity`, so
+  the theme must be an AppCompat one and `androidx.appcompat` is needed.
+- `checkDebugDuplicateClasses` fails with kotlin-stdlib 1.8.22 vs
+  stdlib-jdk7/jdk8 1.6.21 pulled transitively by AndroidX; fixed with the
+  `kotlin-bom:1.8.22` platform in `app/build.gradle` (there is no Kotlin code).
+- Groovy DSL needs `prop = value` assignment syntax (the space syntax is
+  deprecated for Gradle 10); the build is warning-free with `--warning-mode all`.
+- `AConfiguration_getUiMode` does not exist in the NDK, it is
+  `AConfiguration_getUiModeType`.
+- The ADR 0001 `configChanges` list encodes to `0x40007ffc` in the built
+  manifest. The APK has only `lib/arm64-v8a/libaseprite.so` and no
+  permissions except AndroidX's own signature-level
+  `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (not INTERNET).
+- Gradle prints "SDK XML version 4" once if cmdline-tools are newer than AGP;
+  harmless.
+- Not verified without the tablet: that HarmonyOS 4.3 starts the activity,
+  honours the immersive mode and reports the GL strings; see the tablet
+  checklist in the M0.5 report.
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |
@@ -484,3 +509,33 @@ Collected with read-only `adb` (`getprop`, `dumpsys display|input|SurfaceFlinger
   the framework turns the palm flag into `TOOL_TYPE_PALM` or `ACTION_CANCEL`
   must be checked in the M0.6 probe. Baseline strategy stays **stylus
   priority** (ignore fingers while the pen is in range/touching).
+
+### M0.5 hello APK on the device (2026-10-22)
+
+Installed by the user (`adb install -r`), logcat read by the main session.
+Result: **passed** — solid colour full-screen, no crash.
+
+- Startup: `sdk=31 density=400`, window and `ANativeWindow` 2800×1840,
+  `GL_RENDERER: Maleoon 920A`, `OpenGL ES 3.2`, GLSL ES 3.20. First frame
+  displayed +415 ms after launch.
+- Refresh: `Display.getRefreshRate()` reports **120 Hz**, not 144; steady
+  ~120 fps with `swapInterval=1`, dips to 70–80 fps while rotating. Getting
+  144 Hz probably needs `ANativeWindow_setFrameRate()` / a preferred display
+  mode (M4.3).
+- Rotation (4×): no activity recreation; `APP_CMD_CONFIG_CHANGED` +
+  `WINDOW_RESIZED` (1840×2800 ↔ 2800×1840) + `CONTENT_RECT_CHANGED`. The
+  configChanges list from ADR 0001 works on HarmonyOS 4.3. (The stub logs
+  the startup `AConfiguration` on config change, so `orientation=` there is
+  stale — cosmetic.)
+- Home / Recents / power button (5 cycles): `PAUSE → TERM_WINDOW` (EGL
+  destroyed) `→ STOP → SAVE_STATE`, then `START → RESUME → INIT_WINDOW`
+  with a fresh EGL context each time. No crash.
+- HarmonyOS sends **`APP_CMD_LOW_MEMORY` right after every `SAVE_STATE`**
+  (every time the app goes to background), even with plenty of memory.
+  Don't treat it as real memory pressure (no cache purge/autosave storm).
+- **Swiping the app away from Recents kills the process (SIGKILL,
+  "remove task") — no `APP_CMD_DESTROY`, `android_main` never returns.**
+  So Aseprite must flush data-recovery/session state on `PAUSE`/`STOP`,
+  never rely on a clean exit (M2.5).
+- Touch input reaches the native side (`APP_CMD 20` + motion events,
+  currently ignored by the stub).

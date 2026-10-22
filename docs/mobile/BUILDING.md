@@ -105,6 +105,47 @@ ADR 0003 section 5, `ENABLE_TESTS=OFF`, `LAF_WITH_EXAMPLES=OFF`. Results
 (`build/android/lib/lib*.a`) and the known `app-lib` blockers: NOTES.md
 section 6, "Root project cross-build".
 
+## M0.5 Build the APK (Gradle skeleton)
+
+```
+source android/scripts/env.sh
+cd android && ./gradlew :app:assembleDebug
+# -> android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Versions (all pinned): Gradle 8.14.6 (wrapper, sha256 checked), AGP 8.13.2,
+compileSdk 35, targetSdk 34, minSdk 29, NDK r26b, SDK CMake 3.31.6,
+`androidx.games:games-activity:4.4.2` (prefab static), `androidx.appcompat`
+1.7.1. AGP 9.x was not used: it needs build-tools 36 and Gradle 9.
+
+- Gradle itself comes from the wrapper: the first `./gradlew` downloads
+  Gradle 8.14.6 into `~/.gradle/wrapper/dists` and dependencies into
+  `~/.gradle/caches` (about 0.6 GB after the first build). Nothing else
+  needs installing. `JAVA_HOME` must be JDK 17 (env.sh does it).
+- The APK is signed with the default debug key `~/.android/debug.keystore`
+  (created by AGP on first build, inside the already-listed `~/.android`).
+- `data/` is packaged into APK `assets/` by Gradle (`sourceSets.main.assets`
+  points at `../../data`), no copy step.
+- The native part is a separate small CMake project in
+  `android/app/src/main/cpp` (a stub `android_main` that logs and clears the
+  window); the Aseprite root CMake is wired in at M1.
+- Build outputs are git-ignored (`android/.gitignore`): `android/.gradle`,
+  `android/build`, `android/app/build`, `android/app/.cxx`,
+  `local.properties`. `ANDROID_HOME` comes from env.sh, no `local.properties`
+  is needed.
+
+Inspect the result:
+
+```
+BT=$ANDROID_HOME/build-tools/35.0.0
+$BT/aapt2 dump badging android/app/build/outputs/apk/debug/app-debug.apk
+$BT/apksigner verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep lib/
+```
+
+Install on the tablet (done by the user, D5):
+`adb install -r android/app/build/outputs/apk/debug/app-debug.apk`.
+
 ## Disk usage
 
 | Path | Size |
@@ -113,7 +154,7 @@ section 6, "Root project cross-build".
 | `~/Android/jdk-17` | 0.3 GB |
 | `~/deps/skia-m124-android` (.git 0.7 GB, externals ~7 GB incl. emsdk 1.1 GB, out 0.17 GB) | ~8.7 GB (~7.6 GB without emsdk) |
 | `~/.android` (adb keys, Android CLI binary) | ~0.1 GB |
-| `~/.gradle` (appears with the first Gradle build, M0.5) | ~1-2 GB expected |
+| `~/.gradle` (Gradle 8.14.6 distribution, dependency and build caches; wrapper dists + caches) | ~0.6 GB measured after M0.5 |
 
 ## Uninstall
 
@@ -124,9 +165,10 @@ removal is deleting directories. Run:
 adb kill-server                                    # before deleting the SDK
 rm -rf ~/Android                                   # SDK, NDK, CMake, Ninja, adb, JDK
 rm -rf ~/deps/skia-m124-android ~/deps/skia-build.log && rmdir ~/deps   # rmdir fails harmlessly if ~/deps holds other things
-rm -rf ~/.gradle                                   # after the first Gradle build (M0.5)
+rm -rf ~/.gradle                                   # Gradle distribution + caches (M0.5); run `android/gradlew --stop` first
 rm -rf ~/.android/bin ~/.android/cli               # Android CLI downloaded by sdkmanager
 rm -rf ~/.java/.userPrefs/google                   # created by sdkmanager; leave sibling dirs (jetbrains, ...) alone
+rm -rf <repo>/android/.gradle <repo>/android/build <repo>/android/app/build <repo>/android/app/.cxx   # Gradle build trees (git-ignored)
 rm -rf <repo>/build/android                        # planned Android build tree (git-ignored via `build`)
 ```
 
