@@ -552,7 +552,7 @@ reverted.
   until an event or the deadline; `-1` only while paused without a window
   (ADR 0007 §4); `queueEvent` from other threads → `ALooper_wake`. App code
   may run inside `getEvent()` (resize → `handleWindowResize`), like X11
-  ConfigureNotify. Motion input → mouse events since M2.1 (see "Pen/finger → mouse events"); keys are only logged until M2.3.
+  ConfigureNotify. Motion input → mouse events since M2.1 (see "Pen/finger → mouse events"); keys → KeyDown/KeyUp since M2.3 (see "Files, keyboard, soft keyboard").
 - **Capabilities on Android:** WindowScale, ColorSpaces,
   GpuAccelerationSwitch (no MultipleWindows/CanResizeWindow/CustomMouseCursor).
 - **Scroll sign contract (M1.2 ↔ M2.1):** `delta.y = -AXIS_VSCROLL`,
@@ -787,6 +787,74 @@ tablet.
   maximum size is never reached until the user moves the right handle of
   the pressure threshold in the dynamics popup below ~0.85. Candidate
   Android default (app side, not done): 0.8.
+
+### Files, keyboard, soft keyboard (M4.1 + M2.3 + M2.4, 2026-10-22, branch `mobile/m3-files`)
+
+laf branch `mobile/laf-files` (from `8e5aa7b`). Not yet tested on the
+tablet. Design of the file part: ADR 0009.
+
+- **SAF documents** (`os/android/documents.{h,cpp}`, API in
+  `os/android/android_app.h`: `android_pick_documents()`,
+  `android_document_to_provider()`, `android_document_from_provider()`).
+  `dlgs/file_dialog_android.cpp` (`FileDialog::makeAndroid()`) is a thin
+  adapter; `laf-dlgs` links `laf-os` on Android only. Java side:
+  `AsepriteActivity.startDocumentPicker()`, `onActivityResult()`,
+  `copyDocumentToFile()`, `copyFileToDocument()` (`"wt"`, fallback
+  `openFileDescriptor("rwt")`), `renameDocument()`,
+  `releaseDocumentPermission()`; result → native through
+  `nativeOnDocumentsPicked`, registered with `RegisterNatives()` on the
+  first picker (no exported `Java_` symbol, works with the `-u` link
+  setup). The picker waits in `AppAndroid::pollLooper(-1)` (woken by
+  `ALooper_wake` from the callback), so PAUSE/TERM_WINDOW/RESUME/
+  INIT_WINDOW are processed while it's open.
+  - Cache path: `<cacheDir>/documents/<fnv1a64(uri)>/<display name>`;
+    registry `<filesDir>/saf-documents.txt` (`uri<TAB>path`, MRU, 64).
+  - App hooks (`#if LAF_ANDROID`): `FileOp::createLoadDocumentOperation()`
+    → `android_document_from_provider()`; `FileOp::operate()` →
+    `FileOp::saveToAndroidDocument()` after every saved file (worker
+    thread, `JniThreadEnv` attaches it). Default
+    `experimental.useNativeFileDialog=true` on Android.
+  - Logs (INFO, tag `laf`): `documents: request N: showing the save picker (name="…" initial uri=…)`,
+    `documents: request N: result 1 with 1 document(s) after … ms`,
+    `documents: content://… -> /data/user/0/…/cache/documents/<hash>/<name>`,
+    `documents: saved <path> -> content://… in N ms`,
+    `documents: refreshed <path> <- content://…`; errors `documents: cannot …`.
+  - JNI strings go through UTF-16 (`jni_to_string`/`jni_new_string`),
+    because CheckJNI aborts on 4-byte UTF-8 in `NewStringUTF()`.
+- **Hardware keyboard** (`os/android/keys.{h,cpp}`, host test
+  `keys_tests`). `KeyInputAndroid`: `AKEYCODE_*` → `KeyScancode` table
+  (X-macro, values checked with `static_assert` against the NDK on
+  Android), `metaState` → modifiers (+ Space modifier), `unicodeChar`
+  from `GameActivityKeyEvent` (= `KeyEvent.getUnicodeChar()`, already
+  layout/Shift aware, Ctrl ignored), `repeatCount` → repeat. `BACK` →
+  `kKeyEsc` without character. Key 718 is ignored here (pen double-tap,
+  gestures task). Unknown keys with a character are sent with
+  `kKeyNil` + the character; dead keys are sent without character (not
+  composed). Pressed keys are tracked per Android key code
+  (`System::isKeyPressed()`, `keyModifiers()` via `CommonSystem`), reset
+  on `APP_CMD_PAUSE`, `APP_CMD_LOST_FOCUS` and
+  `System::resetKeyPressed()`; a modifier whose metaState bit is off in a
+  later event is dropped (lost UP). Right Alt is `kKeyAlt` (not AltGr,
+  which Aseprite treats as Ctrl+Alt). Verbose log per key:
+  `input: key DOWN keyCode=… scanCode=… meta=0x… repeat=… unicode=0x… device=… source=0x… -> KeyDown scancode=… unicode=0x… modifiers=0x…`.
+- **Soft keyboard** (`os/android/text_input.{h,cpp}`, host test
+  `text_input_tests`). `System::setTextInput(true)` →
+  `GameActivity_setTextInputState("")` + `GameActivity_showSoftInput()`;
+  `false` → `hideSoftInput()`. Not shown when a hardware keyboard is
+  attached (`AConfiguration_getKeyboard()==QWERTY` and keys not hidden;
+  logged at startup and on CONFIG_CHANGED as
+  `keyboard=… keysHidden=… (hardware keyboard attached|not attached)`),
+  which also avoids double input through GameTextInput. Each IME text
+  change → Backspaces for the removed tail + KeyDown/KeyUp per new
+  character (`\n` → Enter); IME action "Done" (`APP_CMD_EDITOR_ACTION`) →
+  Enter. The glue's `onTextInputEvent` only sets `textInputState`
+  without waking the looper (checked in the 4.4.2 static lib), so laf
+  wraps the callback and calls `ALooper_wake`. `ui::Entry::setCaretPos()`
+  asks for text input only when focused on Android (`src/ui/entry.cpp`),
+  otherwise filling a dialog would pop up the keyboard. Logs:
+  `input: text input on, showing the soft keyboard`, `… off, hiding …`,
+  `input: soft keyboard hidden by the user`; verbose
+  `input: soft keyboard text "…" -> N key event(s)`.
 
 ## 7. Integration points in the code (for all agents)
 

@@ -366,8 +366,8 @@ Accept: user confirms checklist items.
 |---|------|-------|--------|--------|
 | M2.1 | Pen + finger → mouse events with pressure and history | laf-backend | see below | **code done** (2026-10-22), `mobile/m2-input` + laf `mobile/laf-input`, host test passes; awaiting tablet test (NOTES §6 "Pen/finger → mouse events") |
 | M2.2 | Hover → cursor/brush preview (no distance) | laf-backend | see below | **code done** (2026-10-22), with M2.1; awaiting tablet test |
-| M2.3 | Hardware keyboard, key filter, Back | laf-backend | see below | todo |
-| M2.4 | Soft keyboard / IME via GameTextInput | laf-backend | see below | todo |
+| M2.3 | Hardware keyboard, key filter, Back | laf-backend | see below | **code done** (2026-10-22), `mobile/m3-files` + laf `mobile/laf-files`, host test `keys_tests`; awaiting tablet test |
+| M2.4 | Soft keyboard / IME via GameTextInput | laf-backend | see below | **code done** (2026-10-22), with M2.3, host test `text_input_tests`; awaiting tablet test |
 | M2.5 | Lifecycle robustness (surface loss, SIGKILL, recovery) | laf-backend | see below | todo |
 | M2.6 | Files in app-specific storage | build-engineer | see below | todo |
 | M2.7 | M2 review + tablet checklist | reviewer | see below | todo |
@@ -543,7 +543,7 @@ first try in a 20-tap test.
 
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
-| M4.1 | SAF Open / Save As (ACTION_OPEN_DOCUMENT / CREATE_DOCUMENT) | laf-backend (JNI) + touch-ux (menu wiring) | see below | todo |
+| M4.1 | SAF Open / Save As (ACTION_OPEN_DOCUMENT / CREATE_DOCUMENT) | laf-backend (JNI) + touch-ux (menu wiring) | see below | **code done** (2026-10-22), ADR 0009, `mobile/m3-files` + laf `mobile/laf-files`; awaiting tablet test |
 | M4.2 | Clipboard (text + image) via `ClipboardManager` | laf-backend | see below | todo |
 | M4.3 | 144 Hz and latency | laf-backend | see below | todo |
 | M4.4 | Logs and crash collection | build-engineer | see below | todo |
