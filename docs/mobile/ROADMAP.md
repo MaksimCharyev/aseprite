@@ -328,8 +328,8 @@ Accept: user confirms checklist items.
 
 | # | Task | Owner | Accept | Status |
 |---|------|-------|--------|--------|
-| M2.1 | Pen + finger → mouse events with pressure and history | laf-backend | see below | todo |
-| M2.2 | Hover → cursor/brush preview (no distance) | laf-backend | see below | todo |
+| M2.1 | Pen + finger → mouse events with pressure and history | laf-backend | see below | **code done** (2026-10-22), `mobile/m2-input` + laf `mobile/laf-input`, host test passes; awaiting tablet test (NOTES §6 "Pen/finger → mouse events") |
+| M2.2 | Hover → cursor/brush preview (no distance) | laf-backend | see below | **code done** (2026-10-22), with M2.1; awaiting tablet test |
 | M2.3 | Hardware keyboard, key filter, Back | laf-backend | see below | todo |
 | M2.4 | Soft keyboard / IME via GameTextInput | laf-backend | see below | todo |
 | M2.5 | Lifecycle robustness (surface loss, SIGKILL, recovery) | laf-backend | see below | todo |

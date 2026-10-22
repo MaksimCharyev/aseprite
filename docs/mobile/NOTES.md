@@ -552,7 +552,7 @@ reverted.
   until an event or the deadline; `-1` only while paused without a window
   (ADR 0007 §4); `queueEvent` from other threads → `ALooper_wake`. App code
   may run inside `getEvent()` (resize → `handleWindowResize`), like X11
-  ConfigureNotify. Input is only logged until M2.
+  ConfigureNotify. Motion input → mouse events since M2.1 (see "Pen/finger → mouse events"); keys are only logged until M2.3.
 - **Capabilities on Android:** WindowScale, ColorSpaces,
   GpuAccelerationSwitch (no MultipleWindows/CanResizeWindow/CustomMouseCursor).
 - **Scroll sign contract (M1.2 ↔ M2.1):** `delta.y = -AXIS_VSCROLL`,
@@ -721,6 +721,72 @@ laf branch `mobile/laf-insets` (from `9f5524a`), only `os/android/`.
   square and shadow, an adaptive mask would put it on a second tile.
   Manifest `android:icon="@mipmap/ic_launcher"`. `versionCode 3`,
   `versionName 0.0.4-m1-<variant>`.
+
+### Pen/finger → mouse events (M2.1 + M2.2, 2026-10-22, branch `mobile/m2-input`)
+
+laf branch `mobile/laf-input` (from `mobile/laf-insets`), only `os/android/`
+and `os/CMakeLists.txt` (source list + a host test). Not yet tested on the
+tablet.
+
+- **Where.** `os/android/pointer_input.{h,cpp}`: `PointerInputAndroid`, a
+  pure C++ state machine fed with `MotionEventAndroid` (a copy of the
+  `GameActivityMotionEvent` fields we use; constants equal to
+  `<android/input.h>`, checked with `static_assert` in `app.cpp`).
+  `AppAndroid::processInput()` converts each event (pointers + every
+  historical sample, `GameActivityMotionEvent_getHistorical*`), calls it and
+  queues the result on the window. Host test
+  `os/android/pointer_input_tests.cpp` (`pointer_input_tests` in ctest,
+  built when `LAF_WITH_TESTS` and not Android).
+- **What `os::Event`s are emitted** (for mobile-touch-ux / M3):
+
+  | Android input | os::Event | PointerType | button | pressure |
+  |---|---|---|---|---|
+  | stylus `DOWN` | `MouseEnter` (if not inside), `MouseMove`, `MouseDown` (or `MouseDoubleClick`) | `Pen` (`Eraser` for `TOOL_TYPE_ERASER`) | `Left`; `Right` if `BUTTON_STYLUS_PRIMARY`, `Middle` if `…SECONDARY` at down | `AXIS_PRESSURE` clamped 0..1 |
+  | stylus `MOVE` (touching) | one `MouseMove` per historical sample + current | same | — | per sample |
+  | stylus `UP` | `MouseMove` for historical samples, `MouseUp` at the last emitted position (the UP sample itself is skipped: its pressure may be 0) | same | held button | 0 |
+  | stylus `HOVER_ENTER/MOVE` | `MouseEnter` (if not inside), `MouseMove` (+history) | `Pen` | none | 0 |
+  | stylus `HOVER_EXIT` | `MouseLeave` **50 ms later**, dropped if `DOWN`/`HOVER_*` comes first | `Pen` | — | — |
+  | stylus `UP`/`CANCEL` without following hover | `MouseLeave` 150 ms later | | | |
+  | finger `DOWN` (first pointer) | `MouseEnter` (if not inside), `MouseMove`, `MouseDown`/`MouseDoubleClick` | `Touch` | `Left` | 0 (finger pressure not forwarded, it's not 0..1) |
+  | finger `MOVE` | `MouseMove` per sample of the first finger only | `Touch` | — | 0 |
+  | finger `UP` | `MouseMove` (if moved), `MouseUp`; **no** `MouseLeave` | `Touch` | `Left` | 0 |
+  | `POINTER_DOWN` (2nd+ finger) | nothing (M3) | | | |
+  | `POINTER_UP` of the first finger | `MouseUp`, rest of the stream ignored | | | |
+  | `ACTION_CANCEL` (any tool) | `MouseUp` of the held button (placeholder, M3.1 turns it into a real cancel); nothing if no button | | | |
+  | finger stream starting while the pen is in range (hovering, touching, or within the deferred leave) | ignored until `UP`/`CANCEL` | | | |
+  | pen enters range / touches while a finger drives the mouse | finger `MouseUp`, rest of the finger stream ignored | | | |
+  | `TOOL_TYPE_PALM` | finger stream ignored / ended | | | |
+  | mouse `DOWN/MOVE/UP`, hover | as stylus, buttons from `buttonState` (primary/secondary/tertiary/back/forward → Left/Right/Middle/X1/X2) | `Mouse` | | 0 |
+  | mouse `SCROLL` | `MouseWheel` delta.y = −`AXIS_VSCROLL`, delta.x = +`AXIS_HSCROLL`, fractions accumulated, not precise | `Mouse` | | |
+  | `actionIndex >= pointerCount` (9th+ pointer) | skipped | | | |
+
+  Positions: window px (floor) / `Window::scale()`. Consecutive moves in the
+  same scaled pixel are merged (at scale 3, 144 Hz). Modifiers are left
+  `kKeyUninitializedModifier` (ui asks `System::keyModifiers()`, M2.3).
+  Double click: same pointer type + button, ≤ 300 ms, ≤ 16 dp (40 px)
+  apart, like `os/x11` (ui turns unused double clicks into a down).
+  `System::mousePosition()` = last pointer position (window px).
+  `APP_CMD_PAUSE` → `reset()`: `MouseUp` if held, `MouseLeave`.
+  Tilt/orientation are read into `MotionPointerAndroid` but `os::Event` has
+  no field yet (ADR 0006 §1).
+- **Event loop.** `pollLooper()` clamps its wait to
+  `PointerInputAndroid::nextTimeout()` so the deferred `MouseLeave` is
+  emitted on time even with `getEvent(kWithoutTimeout)`; no busy wait
+  (the timer is cleared when it fires). `AXIS_VSCROLL/HSCROLL` are enabled
+  with the other axes.
+- **Logs** (tag `laf`). INFO, once per process:
+  `input: pen order: HOVER_EXIT then DOWN after N ms (MouseLeave dropped)`,
+  `input: finger stream ignored (<reason>), logged once`; INFO each time:
+  `input: finger stream ended (<reason>), MouseUp sent`,
+  `input: pen ACTION_CANCEL, MouseUp sent …`. Verbose
+  (`debug.laf.verbose 1`): every raw event
+  `input: motion <ACTION> index=… source=0x… pointers=… history=… buttons=… [0] id=… <tool> x=… y=… pressure=… tilt=… orientation=…`
+  and every emitted event `input: -> MouseMove pos=x,y Pen button=0 pressure=…`.
+- **Pressure range.** The M-Pencil 3 tops out at ~0.857 while Aseprite's
+  default `max_pressure_threshold` is 0.9 (`data/pref.xml:518`), so the
+  maximum size is never reached until the user moves the right handle of
+  the pressure threshold in the dynamics popup below ~0.85. Candidate
+  Android default (app side, not done): 0.8.
 
 ## 7. Integration points in the code (for all agents)
 
