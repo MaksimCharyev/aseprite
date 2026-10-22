@@ -72,6 +72,9 @@ Preferences::Preferences() : app::gen::GlobalPref("")
   general.screenScale.setDefaultValue(3);
   general.uiScale.setDefaultValue(1);
   experimental.useNativeFileDialog.setDefaultValue(false);
+  // Skia GL over EGL: the raster path copies every frame with the CPU
+  // and the panel stays at 60 Hz with it.
+  general.gpuAcceleration.setDefaultValue(true);
 #endif
 
   load();
