@@ -26,6 +26,8 @@ int AppOS_get_name(lua_State* L)
   lua_pushstring(L, "Windows");
 #elif LAF_MACOS
   lua_pushstring(L, "macOS");
+#elif LAF_ANDROID
+  lua_pushstring(L, "Android");
 #elif LAF_LINUX
   lua_pushstring(L, "Linux");
 #else
@@ -61,7 +63,13 @@ int AppOS_get_macos(lua_State* L)
 
 int AppOS_get_linux(lua_State* L)
 {
+#if LAF_ANDROID
+  // laf reports Platform::os == Linux on Android (no OS::Android), but
+  // scripts asking for "linux" mean a desktop Linux.
+  lua_pushboolean(L, false);
+#else
   lua_pushboolean(L, base::Platform::os == base::Platform::OS::Linux);
+#endif
   return 1;
 }
 
