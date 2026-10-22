@@ -319,8 +319,9 @@ bool DrawingState::onKeyDown(Editor* editor, KeyMessage* msg)
 
 bool DrawingState::onKeyUp(Editor* editor, KeyMessage* msg)
 {
-  // Cancel loop pressing Esc key...
-  if (msg->scancode() == ui::kKeyEsc ||
+  // Cancel loop pressing Esc key, or when the system cancels the
+  // pointer stroke (e.g. palm rejection on Android)...
+  if (msg->scancode() == ui::kKeyEsc || msg->scancode() == ui::kKeyPointerCancel ||
       // Cancel "Shift on freehand" line preview when the Shift key is
       // released and the user didn't press the mouse button.
       (m_type == DrawingType::LineFreehand && !m_mousePressedReceived &&

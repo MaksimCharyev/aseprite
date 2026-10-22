@@ -30,6 +30,7 @@ ScrollingState::ScrollingState()
 bool ScrollingState::onMouseDown(Editor* editor, MouseMessage* msg)
 {
   m_oldPos = msg->position();
+  m_initialScroll = View::getView(editor)->viewScroll();
 
   editor->captureMouse();
   return true;
@@ -75,6 +76,13 @@ bool ScrollingState::onKeyDown(Editor* editor, KeyMessage* msg)
 
 bool ScrollingState::onKeyUp(Editor* editor, KeyMessage* msg)
 {
+  // The system cancelled the pointer (e.g. a palm detected late, or a
+  // second finger for a pan/pinch gesture): undo the scroll, the
+  // MouseUp that follows ends this state.
+  if (msg->scancode() == kKeyPointerCancel) {
+    editor->setEditorScroll(m_initialScroll);
+    return true;
+  }
   return false;
 }
 

@@ -37,6 +37,7 @@ public:
 
 private:
   gfx::Point m_oldPos;
+  gfx::Point m_initialScroll;
 };
 
 } // namespace app
