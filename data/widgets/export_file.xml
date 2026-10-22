@@ -6,6 +6,7 @@
     <grid columns="3">
       <label text="@.output_file" for="output_field" />
       <filename id="output_field" cell_align="horizontal" cell_hspan="2" />
+      <label id="saved_to" cell_hspan="3" visible="false" />
       <label id="resize_label" text="@.resize" for="resize" />
       <hbox cell_hspan="2" cell_align="horizontal">
         <combobox id="resize" editable="true" suffix="%" expansive="true">

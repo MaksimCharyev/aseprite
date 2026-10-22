@@ -19,6 +19,7 @@
 #include "app/context_access.h"
 #include "app/doc.h"
 #include "app/doc_undo.h"
+#include "app/file/android_exports.h"
 #include "app/file/file.h"
 #include "app/file/file_format.h"
 #include "app/file/gif_format.h"
@@ -254,7 +255,13 @@ void SaveFileBaseCommand::saveDocumentInBackground(const Context* context,
     document->impossibleToBackToSavedState();
   }
   else {
-    if (should_add_file_to_recents(context, params()))
+    bool addToRecents = should_add_file_to_recents(context, params());
+#if LAF_ANDROID
+    // The cache copy of an export is deleted after it's published.
+    if (is_android_export(filename))
+      addToRecents = false;
+#endif
+    if (addToRecents)
       App::instance()->recentFiles()->addRecentFile(filename);
 
     if (markAsSaved == MarkAsSaved::On) {
@@ -265,6 +272,18 @@ void SaveFileBaseCommand::saveDocumentInBackground(const Context* context,
     }
 
     if (context->isUIAvailable() && params().ui()) {
+#if LAF_ANDROID
+      // Exports are published to Download/Aseprite (ADR 0010).
+      if (is_android_export(filename)) {
+        std::string name = android_export_display_name(filename);
+        if (fop->isSequence() && fop->filenames().size() > 1) {
+          name = android_export_display_name(fop->filenames().front()) + " ... " +
+                 base::get_file_name(fop->filenames().back());
+        }
+        StatusBar::instance()->showTip(3000, Strings::export_file_exported_to(name));
+        return;
+      }
+#endif
       StatusBar::instance()->setStatusText(2000,
                                            Strings::save_file_saved(base::get_file_name(filename)));
     }

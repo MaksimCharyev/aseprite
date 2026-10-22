@@ -45,6 +45,11 @@ public:
   }
   bool isReadOnly() const { return m_entry->isReadOnly(); }
   void onUpdateText();
+#if LAF_ANDROID
+  // Fixed output folder: the entry edits only the file name, the
+  // folder button is hidden (exports to Download/Aseprite, ADR 0010).
+  void setFixedPath(const std::string& path);
+#endif
 
   obs::signal<std::string()> SelectOutputFile;
   obs::signal<void()> Change;
@@ -76,6 +81,9 @@ private:
   FilenameButton m_button;
   bool m_editFullPath;
   bool m_askOverwrite;
+#if LAF_ANDROID
+  std::string m_fixedPath;
+#endif
 
   obs::scoped_connection m_editFullPathChangeConn;
 };

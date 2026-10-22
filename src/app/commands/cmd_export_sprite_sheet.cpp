@@ -16,6 +16,7 @@
 #include "app/context_access.h"
 #include "app/doc.h"
 #include "app/doc_exporter.h"
+#include "app/file/android_exports.h"
 #include "app/file/file.h"
 #include "app/file_selector.h"
 #include "app/filename_formatter.h"
@@ -441,6 +442,13 @@ public:
         dataFilename()->fullFilename() == kSpecifiedFilename) {
       dataFilename()->setFilename(base + ".json");
     }
+
+#if LAF_ANDROID
+    // Exports always go to Download/Aseprite (ADR 0010), the fields
+    // edit only the file names.
+    imageFilename()->setFixedPath(android_exports_path());
+    dataFilename()->setFixedPath(android_exports_path());
+#endif
 
     exportButton()->Click.connect([this] { onExport(); });
     sheetType()->Change.connect([this] { onSheetTypeChange(); });
@@ -1363,12 +1371,34 @@ void ExportSpriteSheetCommand::onExecute(Context* context)
     if (!newDocument)
       return;
 
+    std::string tip = Strings::export_sprite_sheet_generated();
+    int tipMsecs = 1000;
+#if LAF_ANDROID
+    // Files published to Download/Aseprite (ADR 0010).
+    std::string exported;
+    for (const std::string& fn : { params.textureFilename(), params.dataFilename() }) {
+      if (is_android_export(fn))
+        exported += (exported.empty() ? android_export_display_name(fn) :
+                                        ", " + base::get_file_name(fn));
+    }
+    if (!exported.empty()) {
+      tip = Strings::export_file_exported_to(exported);
+      tipMsecs = 3000;
+    }
+#endif
     StatusBar* statusbar = StatusBar::instance();
     if (statusbar)
-      statusbar->showTip(1000, Strings::export_sprite_sheet_generated());
+      statusbar->showTip(tipMsecs, tip);
 
     // Save the exported sprite sheet as a recent file
-    if (newDocument->isAssociatedToFile() && should_add_file_to_recents(context, params)) {
+    bool addToRecents = newDocument->isAssociatedToFile() &&
+                        should_add_file_to_recents(context, params);
+#if LAF_ANDROID
+    // The cache copy of an export is deleted after it's published.
+    if (is_android_export(newDocument->filename()))
+      addToRecents = false;
+#endif
+    if (addToRecents) {
       App::instance()->recentFiles()->addRecentFile(newDocument->filename());
     }
 

@@ -22,6 +22,8 @@
 #include "ui/menu.h"
 #include "ui/message.h"
 
+#include <algorithm>
+
 namespace app {
 
 using namespace ui;
@@ -65,16 +67,33 @@ FilenameField::FilenameField(const Type type, const std::string& pathAndFilename
 
 std::string FilenameField::fullFilename() const
 {
+#if LAF_ANDROID
+  if (!m_fixedPath.empty() && m_file.empty())
+    return std::string();
+#endif
   return base::join_path(m_path, m_file);
 }
 
 std::string FilenameField::displayedFilename() const
 {
+#if LAF_ANDROID
+  if (!m_fixedPath.empty())
+    return filename();
+#endif
   return (m_editFullPath ? fullFilename() : filename());
 }
 
 std::string FilenameField::updatedFilename() const
 {
+#if LAF_ANDROID
+  if (!m_fixedPath.empty()) {
+    // Only a file name, a typed '/' would create a subfolder.
+    std::string name = (m_entry ? m_entry->text() : m_file);
+    std::replace(name.begin(), name.end(), '/', '_');
+    return base::join_path(m_fixedPath, name);
+  }
+#endif
+
   std::string result;
   if (!m_entry)
     result = (m_button.text().empty() ? m_path : fullFilename());
@@ -152,6 +171,15 @@ void FilenameField::addFoldersToMenu(ui::Menu* menu,
 
 void FilenameField::setFilename(const std::string& pathAndFilename)
 {
+#if LAF_ANDROID
+  if (!m_fixedPath.empty()) {
+    m_path = m_pathBase = m_fixedPath;
+    m_file = base::get_file_name(pathAndFilename);
+    updateWidgets();
+    return;
+  }
+#endif
+
   const std::string spritePath = base::get_file_path(m_docFilename);
   if (m_editFullPath || spritePath.empty()) {
     m_path = base::get_file_path(pathAndFilename);
@@ -174,6 +202,16 @@ void FilenameField::setFilename(const std::string& pathAndFilename)
   m_pathBase = (spritePath.empty() ? m_path : spritePath);
   updateWidgets();
 }
+
+#if LAF_ANDROID
+void FilenameField::setFixedPath(const std::string& path)
+{
+  const std::string fn = fullFilename();
+  m_fixedPath = path;
+  m_button.setVisible(!m_entry);
+  setFilename(fn);
+}
+#endif
 
 bool FilenameField::onProcessMessage(ui::Message* msg)
 {

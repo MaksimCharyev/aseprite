@@ -43,6 +43,9 @@ public:
 
 private:
   void onOutputFieldChange();
+#if LAF_ANDROID
+  void updateSavedTo();
+#endif
   void updateAniDir();
   void updatePlaySubtags();
   void updateAdjustResizeButton();

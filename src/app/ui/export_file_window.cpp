@@ -12,6 +12,7 @@
 #include "app/ui/export_file_window.h"
 
 #include "app/doc.h"
+#include "app/file/android_exports.h"
 #include "app/file/file.h"
 #include "app/i18n/strings.h"
 #include "app/site.h"
@@ -53,6 +54,14 @@ ExportFileWindow::ExportFileWindow(const Doc* doc)
     }
     outputField()->setFilename(newFn);
   }
+
+#if LAF_ANDROID
+  // Exports always go to Download/Aseprite (ADR 0010), the field edits
+  // only the file name (and the extension, which selects the format).
+  outputField()->setFixedPath(android_exports_path());
+  savedTo()->setVisible(true);
+  updateSavedTo();
+#endif
 
   // Default export configuration
   setResizeScale(m_docPref.saveCopy.resizeScale());
@@ -188,7 +197,26 @@ void ExportFileWindow::setAniDir(const doc::AniDir aniDir)
 void ExportFileWindow::onOutputFieldChange()
 {
   ok()->setEnabled(!outputField()->filename().empty());
+#if LAF_ANDROID
+  updateSavedTo();
+#endif
 }
+
+#if LAF_ANDROID
+void ExportFileWindow::updateSavedTo()
+{
+  savedTo()->setText(
+    Strings::export_file_saved_to(android_export_display_name(outputField()->filename())));
+  if (parent()) { // The window is open
+    // A long name can make the label wider than the window.
+    const gfx::Size hint = sizeHint();
+    if (hint.w > bounds().w)
+      expandWindow(gfx::Size(hint.w, bounds().h));
+    else
+      layout();
+  }
+}
+#endif
 
 void ExportFileWindow::updateAniDir()
 {
