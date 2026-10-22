@@ -44,6 +44,18 @@ Run in parallel (separate worktrees so laf edits/builds don't collide):
    redo, pen double-tap (keyCode 718, debounce) → new `ToggleEraser`,
    M3.1/M3.2 palm `ACTION_CANCEL` discards the stroke without an undo entry.
 
+3. **Files: where they go and naming** (user feedback 2026-10-22: "files
+   don't show where they are saved and the name can't be changed").
+   Today Save writes to `$HOME` = `/data/user/0/<pkg>/files` (app-private,
+   invisible to file managers/USB), and there is no text input. Pull
+   forward: **M4.1 SAF** — Save As / Open via `ACTION_CREATE_DOCUMENT` /
+   `ACTION_OPEN_DOCUMENT` (system picker, any folder, file name typed with
+   the system keyboard) through laf `dlgs`/JNI; **M2.3 hardware keyboard**
+   (Magnetic Keyboard → scancodes) so names/shortcuts can be typed; then
+   M2.4 soft keyboard for Aseprite's own text fields. Until then a file
+   can be pulled with
+   `adb exec-out run-as com.github.maksimcharyev.aseprite cat files/<name> > <name>`.
+
 Still open: M1.9 background flush (ADR 0007), M1.11 review, M2.3 hardware
 keyboard, M2.4 soft keyboard/IME, review follow-ups for the asset
 extractor (fsync, `fs::exists` error_code, clang-format line 35).
