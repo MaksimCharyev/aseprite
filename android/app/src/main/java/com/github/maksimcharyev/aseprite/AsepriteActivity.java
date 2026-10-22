@@ -20,7 +20,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.google.androidgamesdk.GameActivity;
 
 public class AsepriteActivity extends GameActivity {
-  // M0.6 input probe: same tag as the native probe in main.cpp.
+  // M0.6 input probe (only the `probe` native variant logs keys): same tag as the native probe in main.cpp.
   private static final String PROBE_TAG = "AsepriteProbe";
 
   static {
@@ -46,8 +46,9 @@ public class AsepriteActivity extends GameActivity {
     if (mSurfaceView != null) {
       mSurfaceView.setOnHoverListener((View v, MotionEvent event) -> {
         int action = event.getActionMasked();
-        if (action == MotionEvent.ACTION_HOVER_ENTER ||
-            action == MotionEvent.ACTION_HOVER_EXIT) {
+        if (BuildConfig.INPUT_PROBE &&
+            (action == MotionEvent.ACTION_HOVER_ENTER ||
+             action == MotionEvent.ACTION_HOVER_EXIT)) {
           Log.i(PROBE_TAG, "java hover " + MotionEvent.actionToString(action) +
                 " tool=" + event.getToolType(0) +
                 " source=0x" + Integer.toHexString(event.getSource()) +
@@ -59,11 +60,15 @@ public class AsepriteActivity extends GameActivity {
     }
   }
 
-  // Logs every key event that reaches the activity, before GameActivity
-  // forwards it to native code, so we can tell whether a key (e.g. the
-  // M-Pencil double-tap, evdev KEY_F20 / scan 190) arrives at all.
+  // Probe variant only (BuildConfig.INPUT_PROBE). Logs every key event that
+  // reaches the activity, before GameActivity forwards it to native code, so
+  // we can tell whether a key (e.g. the M-Pencil double-tap, evdev KEY_F20 /
+  // scan 190) arrives at all.
   @Override
   public boolean dispatchKeyEvent(KeyEvent event) {
+    if (!BuildConfig.INPUT_PROBE)
+      return super.dispatchKeyEvent(event);
+
     InputDevice device = event.getDevice();
     Log.i(PROBE_TAG, "java key action=" + event.getAction() +
           " keyCode=" + event.getKeyCode() +
