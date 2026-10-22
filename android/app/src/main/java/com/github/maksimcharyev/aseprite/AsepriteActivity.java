@@ -50,7 +50,7 @@ public class AsepriteActivity extends GameActivity {
   private static final float DEFAULT_FRAME_RATE = 144.0f;
 
   // Same tag as laf's os/android logs.
-  private static final String TAG = "laf";
+  private static final String LAF_TAG = "laf";
 
   // System document picker (Storage Access Framework, ADR 0009), used by
   // laf's os/android/documents.cpp. Picker types and results must match
@@ -223,7 +223,7 @@ public class AsepriteActivity extends GameActivity {
           intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(initialUri));
         }
         catch (Exception e) {
-          Log.w(TAG, "documents: invalid initial URI " + initialUri, e);
+          Log.w(LAF_TAG, "documents: invalid initial URI " + initialUri, e);
         }
       }
 
@@ -232,7 +232,7 @@ public class AsepriteActivity extends GameActivity {
         startActivityForResult(intent, REQUEST_DOCUMENTS);
       }
       catch (ActivityNotFoundException | SecurityException e) {
-        Log.e(TAG, "documents: cannot start " + intent.getAction(), e);
+        Log.e(LAF_TAG, "documents: cannot start " + intent.getAction(), e);
         mDocumentRequestId = 0;
         nativeOnDocumentsPicked(requestId, PICK_ERROR, null, null);
       }
@@ -279,7 +279,7 @@ public class AsepriteActivity extends GameActivity {
         getContentResolver().takePersistableUriPermission(uri, grantFlags);
       }
       catch (Exception e) {
-        Log.w(TAG, "documents: cannot persist the permission of " + uri + ": " + e);
+        Log.w(LAF_TAG, "documents: cannot persist the permission of " + uri + ": " + e);
       }
       uriStrings[i] = uri.toString();
       names[i] = queryDisplayName(uri);
@@ -294,7 +294,7 @@ public class AsepriteActivity extends GameActivity {
         return c.getString(0);
     }
     catch (Exception e) {
-      Log.w(TAG, "documents: cannot query the name of " + uri + ": " + e);
+      Log.w(LAF_TAG, "documents: cannot query the name of " + uri + ": " + e);
     }
     String name = uri.getLastPathSegment();
     if (name != null) {
@@ -364,7 +364,7 @@ public class AsepriteActivity extends GameActivity {
       try (OutputStream out = new FileOutputStream(pfd.getFileDescriptor())) {
         copyStream(in, out);
       }
-      Log.i(TAG, "documents: \"wt\" failed (" + firstError + "), saved with \"rwt\"");
+      Log.i(LAF_TAG, "documents: \"wt\" failed (" + firstError + "), saved with \"rwt\"");
       return null;
     }
     catch (Exception e) {
@@ -385,12 +385,12 @@ public class AsepriteActivity extends GameActivity {
           uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
       }
       catch (Exception e) {
-        Log.w(TAG, "documents: cannot persist the permission of " + uri + ": " + e);
+        Log.w(LAF_TAG, "documents: cannot persist the permission of " + uri + ": " + e);
       }
       return uri.toString();
     }
     catch (Exception e) {
-      Log.w(TAG, "documents: cannot rename " + uriString + " to " + displayName + ": " + e);
+      Log.w(LAF_TAG, "documents: cannot rename " + uriString + " to " + displayName + ": " + e);
       return null;
     }
   }
@@ -402,7 +402,7 @@ public class AsepriteActivity extends GameActivity {
         Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
     }
     catch (Exception e) {
-      Log.w(TAG, "documents: cannot release the permission of " + uriString + ": " + e);
+      Log.w(LAF_TAG, "documents: cannot release the permission of " + uriString + ": " + e);
     }
   }
 
