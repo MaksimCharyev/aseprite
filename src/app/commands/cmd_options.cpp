@@ -547,6 +547,27 @@ public:
     // File Explorer file type associations
     fillExtensionsCombobox(winFileTypeToAssociate(), "aseprite");
     winAssociateFileType()->Click.connect([this] { onAssociateFileType(); });
+
+    touchOptions()->setVisible(false);
+#elif LAF_ANDROID
+    {
+      // Tablet section with the touch/pen options only, no File
+      // Explorer section.
+      for (auto item : sectionListbox()->children()) {
+        if (auto* listItem = dynamic_cast<ListItem*>(item)) {
+          if (listItem->getValue() == kSectionTabletId)
+            listItem->setVisible(true);
+          else if (listItem->getValue() == kSectionFileExplorerId)
+            listItem->setVisible(false);
+        }
+      }
+      sectionWindowsSpecificSeparator()->setVisible(false);
+      sectionFileExplorer()->setVisible(false);
+      tabletApiWindowsPointer()->setVisible(false);
+      tabletApiWintabSystem()->parent()->setVisible(false);
+      tabletApiWintabDirect()->setVisible(false);
+      windowsPointerOptions()->setVisible(false);
+    }
 #else // For macOS and Linux
     {
       // Hide the "section_tablet" and "section_file_explorer" items
@@ -740,6 +761,8 @@ public:
 
       onTabletAPIChange();
     }
+#elif LAF_ANDROID
+    penRejectionTimeout()->setTextf("%d", m_pref.touch.penRejectionTimeout());
 #endif
 
     useSelectionToolLoop()->setSelected(m_pref.experimental.useSelectionToolLoop());
@@ -1020,6 +1043,16 @@ public:
     {
       if (win::set_thumbnail_options("aseprite", windowsFileExplorerThumbnailsOptionsFromUI()))
         m_restartExplorerProc = true;
+    }
+#elif LAF_ANDROID
+    // Touch and pen (the "draw with finger" check box is bound to its
+    // preference)
+    {
+      m_pref.touch.penRejectionTimeout(std::clamp(penRejectionTimeout()->textInt(), 0, 2000));
+
+      os::TabletOptions options = m_system->tabletOptions();
+      options.penRejectionTimeout = m_pref.touch.penRejectionTimeout();
+      m_system->setTabletOptions(options);
     }
 #endif
 

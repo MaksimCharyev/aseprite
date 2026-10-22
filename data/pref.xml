@@ -246,6 +246,13 @@
       <option id="api" type="std::string" />
       <option id="set_cursor_fix" type="bool" default="true" />
     </section>
+    <!-- Android only: draw_with_finger = one finger draws on the canvas
+         (otherwise it scrolls); pen_rejection_timeout = fingers are
+         ignored this many milliseconds after the pen leaves the screen -->
+    <section id="touch">
+      <option id="draw_with_finger" type="bool" default="false" />
+      <option id="pen_rejection_timeout" type="int" default="500" />
+    </section>
     <section id="experimental">
       <option id="multiple_windows" type="bool" default="false" />
       <option id="new_render_engine" type="bool" default="true" />

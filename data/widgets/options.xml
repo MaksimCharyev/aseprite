@@ -685,6 +685,19 @@
               <link text="(#4539)" for="set_cursor_fix" url="https://github.com/aseprite/aseprite/issues/4539" />
             </hbox>
           </vbox>
+          <!-- Android only -->
+          <vbox id="touch_options">
+            <separator text="@.touch_and_pen" horizontal="true" />
+            <check id="draw_with_finger"
+                   text="@.draw_with_finger"
+                   tooltip="@.draw_with_finger_tooltip"
+                   pref="touch.draw_with_finger" />
+            <hbox>
+              <label for="pen_rejection_timeout" text="@.pen_rejection_timeout" />
+              <expr id="pen_rejection_timeout" suffix="@.pen_rejection_timeout_unit"
+                    tooltip="@.pen_rejection_timeout_tooltip" />
+            </hbox>
+          </vbox>
         </vbox>
 
         <!-- File Explorer -->

@@ -3064,6 +3064,14 @@ bool Editor::checkForScroll(ui::MouseMessage* msg)
     startScrollingState(msg);
     return true;
   }
+#if LAF_ANDROID
+  // One finger scrolls the canvas instead of drawing (the pen draws).
+  else if (msg->pointerType() == ui::PointerType::Touch &&
+           !Preferences::instance().touch.drawWithFinger()) {
+    startScrollingState(msg);
+    return true;
+  }
+#endif
   else
     return false;
 }

@@ -310,6 +310,10 @@ int App::initialize(const AppOptions& options)
 
   tabletOptions.detectStylusPattern = pref.general.x11StylusId();
 
+#elif LAF_ANDROID
+
+  tabletOptions.penRejectionTimeout = pref.touch.penRejectionTimeout();
+
 #endif
 
   system->setTabletOptions(tabletOptions);
