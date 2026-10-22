@@ -71,7 +71,10 @@ Preferences::Preferences() : app::gen::GlobalPref("")
   // value saved in the configuration file is kept.
   general.screenScale.setDefaultValue(3);
   general.uiScale.setDefaultValue(1);
-  experimental.useNativeFileDialog.setDefaultValue(false);
+  // The native file dialog is the system document picker (Storage
+  // Access Framework), the only way to reach shared folders without
+  // storage permissions.
+  experimental.useNativeFileDialog.setDefaultValue(true);
 #endif
 
   load();
