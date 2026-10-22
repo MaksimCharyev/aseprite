@@ -565,7 +565,9 @@ reverted.
    "Save changes?" dialog with no window) → ANR. Fix: bounded wait
    (≤100 ms) after DESTROY + watchdog `_exit(0)` 2–3 s after DESTROY if
    `app_main` hasn't returned (event_queue.cpp:75-78, app.cpp:357-366).
-2. (M1.6 blocker) `SkiaWindowBase::resizeSkiaSurface`
+2. (M1.6 blocker, **fixed in M1.6**: `keepGpuContextOnResize()`; the
+   existing `resetSkiaSurface()` serves as "recreate the render target",
+   no extra method needed) `SkiaWindowBase::resizeSkiaSurface`
    (`os/skia/skia_window_base.h:86-107`) abandons the GrDirectContext and
    destroys the GL context on every resize → rotation recreates GL. Fix in
    `skia_window_base.h`: opt-in fast path (protected virtual
@@ -579,6 +581,82 @@ reverted.
 5. Key filter: also pass `AKEYCODE_HEADSETHOOK` (79) and `AKEYCODE_MUTE` (91)
    to the system; update ADR 0006 §11 (architect).
 6. TMPDIR fallback dir isn't created → `mkdir` it.
+
+### EGL + Skia GL (M1.6, 2026-10-22, laf branch `mobile/laf-gpu`)
+
+Main-repo branch `mobile/m1-gpu` (worktree `aseprite-m16`). Not yet run
+on the tablet.
+
+- `os/gl/gl_context_egl.h` (header-only like GLX/WGL): EGL 1.4, GLES 3
+  context (ES 2 fallback), RGBA8888 config without depth/stencil,
+  `eglSwapInterval(1)`. Display + context are created by the first
+  `createGLContext()` that has a native window; the EGLSurface follows
+  `setNativeWindow()`. Without a surface the context stays current with
+  `EGL_NO_SURFACE` (`EGL_KHR_surfaceless_context`; 1x1 pbuffer fallback).
+  `isValid()` = the context exists; `createGLContext()` is idempotent and
+  returns true only if there is a surface.
+- `SkiaWindowBase` (`os/skia/skia_window_base.h`): opt-in
+  `keepGpuContextOnResize()` (default false → desktop code path
+  unchanged). When true, a resize/`resetSkiaSurface()` only calls
+  `createGLContext()` + `makeCurrent()` + `resetContext()` +
+  `createRenderTarget()`; the GrDirectContext is kept.
+- `SkiaWindowAndroid`: GPU **on by default** (laf side); TERM_WINDOW →
+  flush, destroy EGLSurface, raster stand-in surface; INIT_WINDOW → new
+  EGLSurface + render target. Context loss (`EGL_CONTEXT_LOST`) →
+  abandon + recreate + repaint.
+- **CPU/EGL exclusivity.** After the first `ANativeWindow_lock()` the
+  window is connected to the CPU producer and `eglCreateWindowSurface()`
+  fails on it. So: raster → GPU switches are applied at the next
+  `INIT_WINDOW` (Home and back); GPU → raster is immediate (destroying a
+  non-current EGLSurface disconnects EGL). The raster path destroys any
+  stray EGLSurface before its first lock.
+- Aseprite's `general.gpu_acceleration` defaults to `false`
+  (`data/pref.xml:157`) and the app calls `setGpuAcceleration(pref)` right
+  after creating the window (`src/app/modules/gui.cpp:164`) and in every
+  `updateAllDisplays()` (`app.cpp:408`), so Aseprite stays raster until
+  M1.10 sets the Android first-run default to true. Testing override
+  without app changes: `adb shell setprop debug.laf.gpu 1` (`0` = raster,
+  empty = app decides), read once per process.
+- `LOG("OS: Using OpenGL backend")` in `skia_gl.cpp` is INFO and the
+  default laf log level is ERROR, so it is not in logcat. The Android
+  window logs its own line, `OS: Using OpenGL backend (GrDirectContext #N,
+  <renderer>, <version>)`, once per GrDirectContext.
+- Logs (tag `laf`): `GL: EGL 1.4 (…), surfaceless_context=1`,
+  `GL: EGLContext created (OpenGL ES 3)`, `GL: EGLSurface #N created
+  (WxH)` / `destroyed`, `GL: first frame on EGLSurface #N (flush+swap X
+  ms)`; verbose: `GL: <reason>: backend=GL window=… EGLSurface=…` and
+  every 2 s `GL: N frames in T s (F fps), flush+swap avg/max`.
+
+### Smoothness: GPU default + 144 Hz (2026-10-22, branch `mobile/m3-smooth`, laf `mobile/laf-smooth`)
+
+laf `mobile/laf-gpu` (M1.6) merged into `mobile/laf-smooth` (from
+`mobile/laf-input`) without conflicts (the GPU code is in `os/skia/*`,
+`os/gl/*`, `os/android/window.h`; M1.10/M2.1 changed `os/android/app.*`).
+Not yet run on the tablet.
+
+- `general.gpu_acceleration` defaults to `true` under `#if LAF_ANDROID`
+  (`src/app/pref/preferences.cpp`, next to screen scale 3). A value saved
+  in `aseprite.ini` still wins (options are saved only when changed, so a
+  first-run ini has no `gpu_acceleration` key). `debug.laf.gpu=0` still
+  forces raster.
+- **Refresh rate.** Two votes, both read `debug.laf.frame_rate` (default
+  144, `0` = don't ask; laf reads it once per process, Java in `onCreate`):
+  - laf `WindowAndroid::setNativeWindow()` (`os/android/window.cpp`) calls
+    `ANativeWindow_setFrameRate(window, 144, COMPATIBILITY_DEFAULT)` for
+    every new ANativeWindow (constructor and `INIT_WINDOW`), loaded with
+    `dlopen("libandroid.so")`/`dlsym` because minSdk is 29. Strategy is the
+    default `ONLY_IF_SEAMLESS`. Log: `Frame rate:
+    ANativeWindow_setFrameRate(144) requested`.
+  - `AsepriteActivity.requestHighRefreshRate()` sets
+    `WindowManager.LayoutParams.preferredDisplayModeId` to the mode with the
+    current physical resolution and the highest refresh rate <= 144 (fallback
+    if HarmonyOS ignores the surface vote). Logs (tag `Aseprite`):
+    `Display modes: <id>:<w>x<h>@<hz> …, current <id> @<hz>` and
+    `Display mode: preferred mode <id> (2800x1840 @144 Hz)`. The system
+    applies it only while the activity is in the foreground; it keeps the
+    panel at 144 Hz even when idle (battery cost while Aseprite is open).
+- Check: `adb shell dumpsys display | grep -iE "mActiveMode|mActiveSfDisplayMode|renderFrameRate|refreshRate"`
+  and `adb shell dumpsys SurfaceFlinger | grep -iE "activeMode|refresh"`.
 
 ### Gradle drives the root CMake (M1.4, 2026-10-22)
 

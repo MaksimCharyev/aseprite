@@ -179,7 +179,7 @@ parallel; M1.4 needs M1.3; M1.8 needs M1.2, M1.6, M1.7.
 | M1.3 | `laf/os/android`: system, ALooper event loop, window, screen, lifecycle | laf-backend | see below | **done** (2026-10-22), laf `da608dc`; review follow-ups in NOTES §6 "laf os/android" |
 | M1.4 | Gradle drives the root CMake; native variants `probe` / `hello_laf` / `aseprite` (ADR 0008 §2-3) | build-engineer | see below | **done** (2026-10-22): probe + hello_laf APKs; hello_laf passed on the tablet (NOTES §6 "M1.4 hello_laf APK on the device") |
 | M1.5 | CPU raster window path, `hello_laf` visible | laf-backend | see below | **done** (2026-10-22), laf `b5f3f25`; verified with the aseprite variant on the tablet |
-| M1.6 | EGL context + Skia GL surface | laf-backend | see below | todo |
+| M1.6 | EGL context + Skia GL surface | laf-backend | see below | implemented (2026-10-22), laf branch `mobile/laf-gpu`, merged into `mobile/laf-smooth` with the Android default `gpu_acceleration=true` (branch `mobile/m3-smooth`); awaiting the tablet check (TEST_CHECKLIST M1.6 + "Smoothness") |
 | M1.7 | Assets under `assets/data/` + manifest + extraction (ADR 0002, 0008 §4) | build-engineer | see below | **done** (2026-10-22): 189 files extracted in 17 ms, "data up to date" on relaunch |
 | M1.8 | Aseprite as `libaseprite.so` (`aseprite` variant) | build-engineer | see below | **done** (2026-10-22): Aseprite Home tab on the tablet (NOTES §6 "M1.8 … first run") |
 | M1.9 | Flush preferences + data recovery on background (ADR 0007) | touch-ux | see below | todo |
@@ -545,7 +545,7 @@ first try in a 20-tap test.
 |---|------|-------|--------|--------|
 | M4.1 | SAF Open / Save As (ACTION_OPEN_DOCUMENT / CREATE_DOCUMENT) | laf-backend (JNI) + touch-ux (menu wiring) | see below | todo |
 | M4.2 | Clipboard (text + image) via `ClipboardManager` | laf-backend | see below | todo |
-| M4.3 | 144 Hz and latency | laf-backend | see below | todo |
+| M4.3 | 144 Hz and latency | laf-backend | see below | 144 Hz request pulled forward (2026-10-22, `mobile/m3-smooth`: `ANativeWindow_setFrameRate` + preferred display mode, NOTES §6 "Smoothness"); latency/partial redraws todo |
 | M4.4 | Logs and crash collection | build-engineer | see below | todo |
 | M4.5 | Final review + full regression checklist | reviewer | see below | todo |
 

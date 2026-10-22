@@ -247,3 +247,75 @@ most of the screen. Edit > Undo History open on the side helps in steps
     scrolls. Set it back to 500.
 12. **Logs to send**: `adb logcat -d -s laf:I Aseprite:V AndroidRuntime:E`
     after the run (gesture lines are INFO, no verbose needed).
+
+## M1.6 — EGL + Skia GL (`aseprite-hello_laf.apk`, `aseprite-aseprite-gpu.apk`, laf `mobile/laf-gpu`)
+
+Before each run the user clears the log (`adb logcat -c`). Collect with
+`adb logcat -d -s laf:V Aseprite:V AndroidRuntime:E DEBUG:F libEGL:V`.
+Count lines with
+`adb logcat -d -s laf | grep -cE "Using OpenGL backend \(GrDirectContext"`.
+
+1. **hello_laf, GPU default.** Install, launch. Expected once:
+   `GL: GPU acceleration on`, `GL: EGL 1.4 (…), surfaceless_context=1`,
+   `GL: EGLContext created (OpenGL ES 3)`, `GL: EGLSurface #1 created
+   (2800x1840)`, `OS: Using OpenGL backend (GrDirectContext #1, Maleoon
+   920A, OpenGL ES 3.2 …)`, `GL: first frame on EGLSurface #1 …`. The
+   picture is the same as with M1.5 (red/green/blue lines, red is red).
+   No `Raster:` lines, no `failed (EGL error …)`.
+2. **Rotate ×5.** Picture follows the rotation; `Window resized: …`
+   only; **no** new `EGLSurface #` and no second `Using OpenGL backend`.
+3. **Home → back ×5, power off/on ×5.** Each cycle: `GL: EGLSurface #N
+   destroyed` after `APP_CMD_TERM_WINDOW`, `GL: EGLSurface #N+1 created`
+   after `Window attached`, then `GL: first frame on EGLSurface #N+1`.
+   Still exactly **one** `Using OpenGL backend` and one `EGLContext
+   created`; no black screen.
+4. **Raster override.** `adb shell setprop debug.laf.gpu 0`, swipe the app
+   away, relaunch: `GL: debug.laf.gpu=0`, `Raster: using the raster
+   backend for this window (GPU acceleration off)`, picture OK, no
+   `EGLSurface` lines. Then `adb shell setprop debug.laf.gpu ""`.
+5. **Aseprite, app default.** Since `mobile/m3-smooth` the Android default
+   of `general.gpu_acceleration` is `true`: `GL: GPU acceleration on` once,
+   no `GPU acceleration off`, no `Raster:` lines, then steps 1–3
+   expectations. (If an old `aseprite.ini` has `gpu_acceleration=false`,
+   the saved value wins: `GPU acceleration off` + `Raster:`; uninstall or
+   force with step 6.)
+6. **Aseprite, GPU forced.** `adb shell setprop debug.laf.gpu 1`, swipe
+   away, relaunch: steps 1–3 expectations (Home tab instead of lines);
+   open a sprite and draw with a finger/pen; open menus. Paste the log.
+7. **Frame stats (optional).** `adb shell setprop debug.laf.verbose 1`,
+   relaunch, scroll/draw for 10 s: `GL: N frames in 2.0 s (F fps),
+   flush+swap avg A ms max M ms` lines (frames = frames the app drew, not
+   the display rate). Reset `debug.laf.verbose 0` and `debug.laf.gpu ""`
+   afterwards.
+
+## Smoothness — GPU default + 144 Hz (`aseprite-aseprite.apk`, branch `mobile/m3-smooth`, laf `mobile/laf-smooth`)
+
+Install `build/apk/aseprite-aseprite.apk`. Before each run the user clears
+the log (`adb logcat -c`). Collect with
+`adb logcat -d -s laf:V Aseprite:V AndroidRuntime:E DEBUG:F`.
+
+1. **Launch.** Expected: `Aseprite: Display modes: … current <id> @60` (or
+   another rate), `Aseprite: Display mode: preferred mode <id> (2800x1840
+   @144 Hz)` (or the highest rate the panel lists), `laf: Frame rate:
+   ANativeWindow_setFrameRate(144) requested`, `GL: GPU acceleration on`,
+   exactly one `OS: Using OpenGL backend (GrDirectContext #1, …)`, no
+   `Raster:` lines.
+2. **Refresh rate while drawing.** Draw continuously with the pen and run
+   `adb shell dumpsys display | grep -iE "mActiveSfDisplayMode|mActiveMode|renderFrameRate"`
+   and `adb shell dumpsys SurfaceFlinger | grep -iE "activeMode|refresh"`.
+   Expected: 144 (or 120) Hz, not 60. Paste both outputs.
+3. **Rotate ×5, Home → back ×5, power off/on ×5.** No black screen; after
+   each `Window attached` a new `Frame rate: ANativeWindow_setFrameRate(144)
+   requested` and `GL: EGLSurface #N created`; still one `Using OpenGL
+   backend`. Repeat step 2 after coming back.
+4. **Baseline without votes.** `adb shell setprop debug.laf.frame_rate 0`,
+   swipe away, relaunch: `Display mode: not requested` and `Frame rate: not
+   requested`; `dumpsys display` should show 60 Hz again (the old
+   behaviour). Then `adb shell setprop debug.laf.frame_rate 120` to compare
+   with a 120 Hz request; reset with `adb shell setprop debug.laf.frame_rate ""`.
+5. **Raster fallback.** `adb shell setprop debug.laf.gpu 0`, swipe away,
+   relaunch: `GL: debug.laf.gpu=0`, `Raster: using the raster backend …`,
+   UI works, drawing works. Reset `adb shell setprop debug.laf.gpu ""`.
+6. **Frame stats (optional).** `adb shell setprop debug.laf.verbose 1`,
+   relaunch, draw for 10 s: `GL: N frames in 2.0 s (F fps), …` — F close
+   to the refresh rate while the stroke moves. Reset `debug.laf.verbose 0`.
