@@ -65,12 +65,13 @@ Preferences::Preferences() : app::gen::GlobalPref("")
 #endif
 
 #if LAF_ANDROID
-  // Defaults for tablets (e.g. 2800x1840 at 400 dpi): a bigger screen
-  // scale than the desktop one (2), so the UI has about the same
-  // physical size as on a 92 dpi monitor. These are only defaults, a
-  // value saved in the configuration file is kept.
-  general.screenScale.setDefaultValue(3);
-  general.uiScale.setDefaultValue(1);
+  // Defaults for tablets (e.g. 2800x1840 at 400 dpi): UI elements are
+  // scaled x4 in total so they are big enough to be tapped, while the
+  // screen scale stays 2 so the canvas keeps a fine zoom granularity.
+  // These are only defaults, a value saved in the configuration file is
+  // kept.
+  general.screenScale.setDefaultValue(2);
+  general.uiScale.setDefaultValue(2);
   // The native file dialog is the system document picker (Storage
   // Access Framework), the only way to reach shared folders without
   // storage permissions.

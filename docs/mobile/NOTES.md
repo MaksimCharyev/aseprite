@@ -1239,3 +1239,12 @@ gives a margin the user accepted (no complaint about clipping).
   display mode for 120–144 Hz, plus the GPU path (M1.6) — pulled forward
   from M4.3.
 - User asks first for two-finger pinch zoom (M3.3).
+
+### UI scale for touch (2026-10-22)
+
+User feedback: at screen scale 3 × UI scale 1 the UI is readable but too
+small to tap. New Android defaults: **screen scale 2 × UI scale 2** (×4 in
+total, +33%): a 16-UI-px button becomes 64 px ≈ 26 dp; the lower screen
+scale keeps a finer canvas zoom granularity. The user can still tune it in
+Edit > Preferences > General (Screen Scaling × UI Elements Scaling). M3.7
+(touch-friendly sizing) remains for widgets that stay too small.
