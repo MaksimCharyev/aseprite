@@ -454,6 +454,44 @@ unused private field `m_news` (`src/app/ui/home_view.h:97`). All upstream,
 none caused by Android. Link errors (undefined `os::` symbols etc.) cannot
 show up before `aseprite` is linked (M1.8).
 
+### `app-lib` for Android (M1.2, 2026-10-22, branch `mobile/m1-app-lib`)
+
+- `src/updater/user_agent.cpp`: `#elif LAF_ANDROID` writes
+  `"Android " << android_get_device_api_level()` (`<android/api-level.h>`;
+  the function is an out-of-line symbol from API 29, which is our minSdk,
+  `ANDROID_PLATFORM=29`). The 4 errors are gone.
+- `cmake --build build/android --target app-lib` succeeds (`lib/libapp-lib.a`,
+  warnings only the upstream ones listed above). Desktop check: a separate
+  host tree (`build/desktop-check`, gcc, `LAF_BACKEND=none`, updater ON)
+  configures and `user_agent.cpp`, `app_os_object.cpp`, `select_shortcut.cpp`,
+  `state_with_wheel_behavior.cpp` compile. A full desktop `app-lib` was not
+  built (needs Skia). `LAF_ANDROID` is defined only by `laf-base` when
+  `ANDROID`; `LAF_LINUX` is NOT defined on Android (so every `#if LAF_LINUX`
+  below is false on Android, `__linux__` is true).
+- Link preview (`--target aseprite -- -k 0`, still an executable until M1.8):
+  one undefined symbol, `os::SkiaSurface::SkiaSurface(sk_sp<SkSurface> const&)`
+  (referenced from `render_text.cpp`, `shader_helpers.cpp`), because the M0.3
+  hack skips the Skia OS sources in laf (reverted by M1.3). Nothing else.
+
+Per-site decisions (Android = `LAF_ANDROID`, `LAF_LINUX` false):
+
+| Site | Android behaviour today | Decision | Reason |
+|------|-------------------------|----------|--------|
+| `app.cpp:82` include `os/x11/system.h` | not included | keep ("other") | X11 only |
+| `app.cpp:309` `detectStylusPattern = x11StylusId` | not set | keep | X11 stylus heuristics; Android reports tool type directly (M2) |
+| `app.cpp:395` `manager->invalidate()` vs `updateAllDisplays()` | `updateAllDisplays()` | keep | the Linux branch is an X11-specific workaround |
+| `app.cpp:501` window icon | skipped | keep | launcher icon comes from the manifest |
+| `file_selector.cpp:23,47` X11 display in `spec` | skipped | keep | no X11 |
+| `file_selector.cpp:64` `get_initial_path_to_select_filename` | `setFileName(initialPath)` | keep | X11 dialog quirk; laf-dlgs has no Android impl, `FileDialog::make()` returns null and the built-in Aseprite selector is used |
+| `file_selector.cpp:105` remember last folder | not stored | keep | applies to the native X11 dialog; revisit with SAF dialog (M4) |
+| `app_os_object.cpp:29` `app.os.name` | was `nil` | **changed**: `"Android"` | nil is wrong for scripts; no desktop effect |
+| `app_os_object.cpp:64` `app.os.linux` | `true` (laf `Platform::os` is `Linux` on Android) | **changed**: `false` on Android | scripts mean desktop Linux; there is no `OS::Android` in laf |
+| `state_with_wheel_behavior.cpp:285` brush-size wheel sign | not inverted | **changed**: invert like Windows/Linux | laf convention (x11: up = -1) is the Windows/Linux sign. CONTRACT for M1.3/M2: the Android backend must report wheel deltas with that sign (up = negative), otherwise remove `LAF_ANDROID` here |
+| `ui/window.cpp:866` `|| true` (no blit on X11) | blit allowed on CPU surface, off with GPU | keep | X11 specific (slow XPutImage copies); GPU path already disables it |
+| `pref/preferences.cpp:56` native dialog off by default | left at default (true), falls back to built-in selector as `make()` is null | keep | the override is for X11 and macOS 10.11 bugs |
+| `select_shortcut.cpp:184` Win key label/tooltip | label "Super" + tooltip (same as before, `__linux__` was true) | **changed** `__linux__` to `LAF_LINUX || LAF_ANDROID` | roadmap said `LAF_LINUX` only, but that would drop the label on Android; an external keyboard Meta key is the logo/Super key, so Linux wording is right. Desktop-neutral |
+| `keyboard_shortcuts.cpp:47-66` | untouched | M3.5 | |
+
 ### Gradle skeleton (M0.5, 2026-10-22)
 
 - Versions: Gradle 8.14.6, AGP 8.13.2 (latest stable 8.x). AGP 9.4.1 is the
