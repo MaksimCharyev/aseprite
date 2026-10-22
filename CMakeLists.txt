@@ -372,9 +372,11 @@ add_subdirectory(laf)
 if(ENABLE_WEBP)
   # Use libwebp from Skia
   if(LAF_BACKEND STREQUAL "skia")
+    # NO_CMAKE_FIND_ROOT_PATH: the Android NDK toolchain restricts
+    # find_library() to the sysroot, which would hide the Skia directory.
     find_library(WEBP_LIBRARIES webp
       NAMES libwebp # required for Windows
-      PATHS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH)
+      PATHS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
     set(WEBP_INCLUDE_DIR "${SKIA_DIR}/third_party/externals/libwebp/src")
     if(WEBP_LIBRARIES)
       set(WEBP_FOUND ON)

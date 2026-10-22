@@ -10,7 +10,8 @@
 if(LAF_BACKEND STREQUAL "skia")
 
   find_library(LIBJPEG_TURBO_LIBRARY NAMES libjpeg jpeg
-    HINTS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH)
+    HINTS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH
+    NO_CMAKE_FIND_ROOT_PATH) # Android NDK toolchain: sysroot-only search
   set(LIBJPEG_TURBO_INCLUDE_DIRS "${SKIA_DIR}/third_party/externals/libjpeg-turbo")
 
   add_library(libjpeg-turbo STATIC IMPORTED)
