@@ -1,0 +1,14 @@
+# Gradle / Android build outputs and per-machine files
+.gradle/
+build/
+app/build/
+app/.cxx/
+.cxx/
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+.idea/
+*.iml
+captures/
