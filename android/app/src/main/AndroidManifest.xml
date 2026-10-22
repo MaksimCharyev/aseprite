@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aseprite
+     Copyright (C) 2026  Maksim Charyev
+
+     This program is distributed under the terms of
+     the End-User License Agreement for Aseprite. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- No permissions on purpose (no INTERNET, ADR 0004). -->
+
+    <uses-feature
+        android:glEsVersion="0x00030000"
+        android:required="true" />
+
+    <application
+        android:allowBackup="false"
+        android:hardwareAccelerated="true"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="Aseprite"
+        android:theme="@style/AsepriteTheme">
+
+        <!-- configChanges per ADR 0001: the activity is never recreated,
+             because app_main() is not re-entrant. -->
+        <activity
+            android:name=".AsepriteActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|touchscreen|density|fontScale|locale|layoutDirection|uiMode|colorMode"
+            android:exported="true"
+            android:launchMode="singleTask">
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="aseprite" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
