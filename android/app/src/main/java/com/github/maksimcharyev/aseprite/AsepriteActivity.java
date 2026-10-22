@@ -9,6 +9,8 @@ package com.github.maksimcharyev.aseprite;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -16,6 +18,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.Display;
@@ -24,6 +27,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.MimeTypeMap;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -37,6 +41,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class AsepriteActivity extends GameActivity {
   // M0.6 input probe (only the `probe` native variant logs keys): same tag as the native probe in main.cpp.
@@ -404,6 +409,126 @@ public class AsepriteActivity extends GameActivity {
     catch (Exception e) {
       Log.w(LAF_TAG, "documents: cannot release the permission of " + uriString + ": " + e);
     }
+  }
+
+  // ---- Public Download folder (MediaStore.Downloads, ADR 0010) ----
+
+  // Copies the file "path" to the MediaStore.Downloads entry
+  // "relativePath" + "displayName" (e.g. "Download/Aseprite/" +
+  // "foo.png"). If this app already has an entry with that name there
+  // it's overwritten, otherwise a new entry is inserted. No permission
+  // is needed for the app's own entries (API 29+).
+  //
+  // Returns "ok\t<uri>\t<display name>\t<new|replaced>" or
+  // "error\t<message>". Called from native code on any thread (the
+  // save worker thread of the app, usually).
+  public String publishDownload(String path, String relativePath, String displayName) {
+    ContentResolver resolver = getContentResolver();
+    Uri collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+    if (!relativePath.endsWith("/"))
+      relativePath += "/";
+
+    Uri uri = null;
+    boolean created = false;
+    try {
+      uri = findDownload(resolver, collection, relativePath, displayName);
+      if (uri != null) {
+        // Hidden from other apps while it's being replaced (best
+        // effort, the file is replaced anyway).
+        try {
+          ContentValues pending = new ContentValues();
+          pending.put(MediaStore.MediaColumns.IS_PENDING, 1);
+          resolver.update(uri, pending, null, null);
+        }
+        catch (Exception e) {
+          Log.w(LAF_TAG, "downloads: cannot mark " + uri + " as pending: " + e);
+        }
+      }
+      else {
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeTypeForName(displayName));
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath);
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+        uri = resolver.insert(collection, values);
+        if (uri == null)
+          return "error\tMediaStore didn't create the entry";
+        created = true;
+      }
+
+      try (InputStream in = new FileInputStream(path);
+           OutputStream out = resolver.openOutputStream(uri, "wt")) {
+        if (out == null)
+          throw new java.io.IOException("MediaStore returned no stream");
+        copyStream(in, out);
+      }
+
+      ContentValues done = new ContentValues();
+      done.put(MediaStore.MediaColumns.IS_PENDING, 0);
+      resolver.update(uri, done, null, null);
+
+      String finalName = queryDisplayName(uri);
+      return "ok\t" + uri + "\t" + finalName + "\t" + (created ? "new" : "replaced");
+    }
+    catch (Exception e) {
+      Log.e(LAF_TAG, "downloads: cannot publish " + path + " to " + relativePath + displayName, e);
+      if (uri != null) {
+        try {
+          if (created) {
+            resolver.delete(uri, null, null);
+          }
+          else {
+            ContentValues done = new ContentValues();
+            done.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            resolver.update(uri, done, null, null);
+          }
+        }
+        catch (Exception e2) {
+          Log.w(LAF_TAG, "downloads: cannot clean up " + uri + ": " + e2);
+        }
+      }
+      return "error\t" + errorMessage(e);
+    }
+  }
+
+  // Our own entry with the given relative path and name (pending
+  // entries left by an interrupted export too), or null. Without
+  // storage permissions MediaStore only returns this app's entries.
+  private static Uri findDownload(ContentResolver resolver, Uri collection,
+                                  String relativePath, String displayName) {
+    String[] projection = { MediaStore.MediaColumns._ID };
+    String selection = MediaStore.MediaColumns.RELATIVE_PATH + "=? AND " +
+                       MediaStore.MediaColumns.DISPLAY_NAME + "=?";
+    String[] args = { relativePath, displayName };
+    Cursor c;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      Bundle query = new Bundle();
+      query.putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection);
+      query.putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, args);
+      query.putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE);
+      c = resolver.query(collection, projection, query, null);
+    }
+    else {
+      c = resolver.query(collection, projection, selection, args, null);
+    }
+    try (Cursor cursor = c) {
+      if (cursor != null && cursor.moveToFirst())
+        return ContentUris.withAppendedId(collection, cursor.getLong(0));
+    }
+    return null;
+  }
+
+  // MIME type from the extension; application/octet-stream keeps any
+  // name as it is (e.g. .aseprite).
+  private static String mimeTypeForName(String name) {
+    int dot = name.lastIndexOf('.');
+    if (dot >= 0) {
+      String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+        name.substring(dot + 1).toLowerCase(Locale.ROOT));
+      if (mime != null)
+        return mime;
+    }
+    return "application/octet-stream";
   }
 
   @Override

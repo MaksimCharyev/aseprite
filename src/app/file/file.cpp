@@ -1067,12 +1067,16 @@ void FileOp::operate(IFileOpProgress* progress)
 
 #if LAF_ANDROID
 // If m_filename is the copy of a document picked in the system file
-// picker, the saved file is copied to that document (ADR 0009).
+// picker, the saved file is copied to that document (ADR 0009). If
+// it's an export (a file in the Download folder mirror of the app
+// cache), it's published to Download/Aseprite (ADR 0010).
 bool FileOp::saveToAndroidDocument()
 {
   std::string error;
-  if (os::android_document_to_provider(m_filename, error))
+  if (os::android_document_to_provider(m_filename, error) &&
+      os::android_publish_download(m_filename, error)) {
     return true;
+  }
   setError("%s\n", error.c_str());
   return false;
 }

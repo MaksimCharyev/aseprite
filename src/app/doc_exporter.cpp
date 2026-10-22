@@ -47,6 +47,10 @@
 #include "render/render.h"
 #include "ver/info.h"
 
+#if LAF_ANDROID
+  #include "os/android/android_app.h"
+#endif
+
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -828,6 +832,18 @@ Doc* DocExporter::exportSheet(Context* ctx, base::task_token& token)
   // Save the metadata.
   if (osbuf)
     createDataFile(samples, os, texture);
+#if LAF_ANDROID
+  // Publish the data file if it's an export to the Download folder
+  // (ADR 0010).
+  if (fos.is_open()) {
+    fos.close();
+    std::string error;
+    if (!os::android_publish_download(m_dataFilename, error)) {
+      Console console;
+      console.printf("%s\n", error.c_str());
+    }
+  }
+#endif
   token.set_progress(0.95f);
 
   // Save the image files.
