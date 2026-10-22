@@ -89,6 +89,22 @@ before the skip existed, reclaim 1.1 GB with
 Measured: build step 3m20s wall clock on 12 cores (1875 ninja steps);
 dependency sync took several minutes more, network bound.
 
+## M0.4 Configure and build the non-GUI libraries
+
+```
+android/scripts/configure-android.sh          # any cwd; build tree build/android
+source android/scripts/env.sh
+cmake --build build/android --target doc-lib render-lib fixmath-lib filters-lib
+```
+
+The script is idempotent (re-running only re-checks the cache) and passes
+extra arguments to cmake, e.g. `-DCMAKE_BUILD_TYPE=Debug`. It fixes:
+NDK toolchain, `arm64-v8a`, `ANDROID_PLATFORM=29`, `c++_static`,
+`LAF_BACKEND=skia` with `SKIA_DIR`/`SKIA_LIBRARY_DIR`, the OFF options of
+ADR 0003 section 5, `ENABLE_TESTS=OFF`, `LAF_WITH_EXAMPLES=OFF`. Results
+(`build/android/lib/lib*.a`) and the known `app-lib` blockers: NOTES.md
+section 6, "Root project cross-build".
+
 ## Disk usage
 
 | Path | Size |

@@ -315,6 +315,78 @@ Gotchas:
   `ctest` 34/34 passed (host gcc, SDK cmake 3.31.6 + ninja).
 - Linux/Android behaviour: runtime is not verified (no device run).
 
+### Root project cross-build, non-GUI libs (M0.4, 2026-10-22)
+
+Branch `mobile/m0-libs` (from `mobile/setup`), **uncommitted**. No laf change
+was needed. Configure with `android/scripts/configure-android.sh` (build tree
+`build/android`, git-ignored): NDK r26b toolchain, `arm64-v8a`,
+`ANDROID_PLATFORM=29`, `c++_static`, `LAF_BACKEND=skia`, ADR 0003 section 5
+OFF options plus `ENABLE_CCACHE=OFF`, `ENABLE_TESTS=OFF`,
+`LAF_WITH_EXAMPLES=OFF`. Configure takes about 45 s the first time.
+
+Result: `doc-lib render-lib fixmath-lib filters-lib` build for
+`aarch64-none-linux-android29` in 23 s on 12 cores (160 steps, no warnings
+from our code), together with `cityhash`, `zlibstatic`, `laf-base`,
+`laf-gfx`. Also built and linking: `giflib cmark fmt json11 lua lualib lauxlib
+tinyxml2 tinyexpr pixman archive_static TinyEXIFstatic png_static dio-lib
+cfg-lib flic-lib tga-lib undo obs view-lib laf-os laf-text laf-ft laf-dlgs
+clip`. (`libdoc-lib.a` is 30 MB with `-g`.)
+
+Patches (shared files, desktop behaviour unchanged):
+
+- `CMakeLists.txt` (libwebp lookup for the Skia backend) and
+  `cmake/FindJpegTurbo.cmake`: `find_library(... NO_DEFAULT_PATH)` into
+  `SKIA_LIBRARY_DIR` silently failed under the NDK toolchain
+  (`CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY`, same gotcha as in
+  `FindSkia.cmake`), giving `WEBP_LIBRARIES-NOTFOUND` /
+  `LIBJPEG_TURBO_LIBRARY-NOTFOUND` (webp and jpeg would then be silently
+  dropped from `app-lib`). Fixed with `NO_CMAKE_FIND_ROOT_PATH` on those two
+  calls; the option is a no-op when `CMAKE_FIND_ROOT_PATH` is empty
+  (desktop). Not done globally on purpose: setting the mode to `BOTH` would
+  let host `/usr/lib` libraries leak into other `find_library` calls.
+
+Surprises, no action needed or deferred:
+
+- Root `PNG_LIBRARY=skia` is chosen by `UNIX AND NOT APPLE AND skia`, which
+  is true on Android too. It works: `libskia.a` contains libpng. `png_static`
+  builds anyway but is not linked.
+- `third_party/libwebp` is not built with the Skia backend (webp comes from
+  Skia's `libwebp.a`).
+- pixman builds only its portable C code (`pixman-x86.c`/`pixman-arm.c` are
+  CPU detection stubs; no NEON). Warning
+  `unknown attribute '__force_align_arg_pointer__'` in `pixman-glyph.c`
+  comes from upstream's `!__x86_64__` test; harmless on arm64, not silenced
+  (submodule, not patched). json11 prints `-Wunqualified-std-cast-call`
+  warnings (upstream third_party).
+- The NDK `Compatibility with CMake < 3.10` deprecation noise comes from
+  `android.toolchain.cmake`, as in M0.3.
+- Desktop: root project configured with host gcc, SDK cmake 3.31.6,
+  `-DLAF_BACKEND=none -DENABLE_UPDATER=OFF -DENABLE_NEWS=OFF`: OK. A desktop
+  Skia configure/build was not possible (no desktop Skia here); the diff only
+  touches `find_library` options, reviewed by hand.
+
+First `app-lib` attempt (`cmake --build build/android --target app-lib`,
+not fixed, input for M1): stops early on two classes of errors.
+
+1. **`gen` is a build-time code generator and is built for the target.**
+   Every `*.xml.h`, `pref.xml.cpp`, `command_ids.ini.h`,
+   `check-translations.txt` rule runs `build/android/bin/gen`, an
+   aarch64-android executable; the host tries to run it through
+   `qemu-aarch64-static` and fails with `Could not open
+   '/system/bin/linker64'` (66 of 68 failed steps). Needs a host-built `gen`
+   (e.g. `ExternalProject_Add` of the root project with host compiler and
+   `-DENABLE_...=OFF`, or a host tool build tree) and `src/app/CMakeLists.txt`
+   (~line 819, `add_custom_command` calls using `$<TARGET_FILE:gen>`) pointing
+   to it when `CMAKE_CROSSCOMPILING`. Everything else in `app-lib` is blocked
+   behind these headers, so further error classes are not known yet.
+2. `src/updater/user_agent.cpp:57-60`: `base::Platform` has no `distroName` /
+   `distroVer` because `laf/base/platform_unix.cpp` is not built on Android
+   (M0.3 decision) and `platform.h` declares those members only for
+   `LAF_LINUX`. `updater-lib` is built even with `ENABLE_UPDATER=OFF`
+   (`src/CMakeLists.txt` adds it unconditionally) because `app-lib` links it
+   for `user_agent`. Fix options: expose the two fields on Android in
+   `laf/base/platform.h`, or guard the distro lines in `user_agent.cpp`.
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |

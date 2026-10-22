@@ -35,7 +35,7 @@ know how the device really reports pen/touch/keys.
 | M0.1 | Host toolchain | build-engineer | see below | **done** (2026-10-21) |
 | M0.2 | Skia m124 for Android | build-engineer | see below | **done** (2026-10-21) |
 | M0.3 | `LAF_ANDROID` platform in laf CMake + base | build-engineer | see below | **done** (2026-10-22), laf branch `mobile/laf-android` + clip branch `mobile/android` (both forks) |
-| M0.4 | Cross-build non-GUI libs | build-engineer | see below | todo |
+| M0.4 | Cross-build non-GUI libs | build-engineer | see below | **done** (2026-10-22), branch `mobile/m0-libs`, uncommitted; see NOTES section 6 |
 | M0.5 | Gradle skeleton + GameActivity "hello" APK | build-engineer | see below | todo |
 | M0.6 | Input probe APK | touch-ux | see below | todo |
 | M0.7 | M0 review + device info checklist | reviewer | see below | todo |
@@ -80,7 +80,7 @@ toolchain and the OFF options from ADR 0003 §5; build targets `doc-lib`,
 they pull in (zlib, libpng, giflib, libwebp, tinyxml2, pixman if needed,
 lua, cmark, fmt, simpleini, json11, qoi, tinyexpr, libarchive). Record
 every patch needed in NOTES.md.
-Accept: `cmake --build build-android --target doc-lib render-lib` succeeds
+Accept: `cmake --build build/android --target doc-lib render-lib` succeeds
 for arm64; desktop `cmake --build build` unchanged.
 
 **M0.5 Gradle skeleton** (ADR 0001, 0004). `android/` with
