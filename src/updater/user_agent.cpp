@@ -14,6 +14,10 @@
 #include "base/platform.h"
 #include "ver/info.h"
 
+#if LAF_ANDROID
+  #include <android/api-level.h>
+#endif
+
 #include <sstream>
 #include <string>
 
@@ -48,6 +52,14 @@ std::string getFullOSString()
 #elif LAF_MACOS
 
   os << "macOS " << p.osVer.major() << "." << p.osVer.minor() << "." << p.osVer.patch();
+
+#elif LAF_ANDROID
+
+  // ----------------------------------------------------------------------
+  // Android (minSdk 29 >= API 29 where android_get_device_api_level()
+  // is declared as a plain function)
+
+  os << "Android " << android_get_device_api_level();
 
 #else
 
