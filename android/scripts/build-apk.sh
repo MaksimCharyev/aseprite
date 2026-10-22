@@ -5,7 +5,7 @@
 # <repo>/build/apk/aseprite-<variant>.apk (git-ignored), so several variants
 # can be installed one after another without rebuilding.
 #
-# Usage: android/scripts/build-apk.sh [probe|hello_laf|aseprite]   (default: probe)
+# Usage: android/scripts/build-apk.sh [aseprite|hello_laf|probe]   (default: aseprite)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +13,7 @@ repo="$(cd "$here/../.." && pwd)"
 # shellcheck source=env.sh
 source "$here/env.sh"
 
-variant="${1:-probe}"
+variant="${1:-aseprite}"
 "$repo/android/gradlew" -p "$repo/android" :app:assembleDebug "-PnativeTarget=$variant"
 mkdir -p "$repo/build/apk"
 cp "$repo/android/app/build/outputs/apk/debug/app-debug.apk" "$repo/build/apk/aseprite-$variant.apk"

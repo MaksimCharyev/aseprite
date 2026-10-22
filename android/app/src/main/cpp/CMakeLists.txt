@@ -11,7 +11,8 @@
 #
 #   probe      M0.6 input probe stub (main.cpp), does not need Skia nor laf
 #   hello_laf  laf/examples/hello_laf.cpp on the laf Android backend
-#   aseprite   the root Aseprite project (not linking yet, M1.8)
+#   aseprite   the root Aseprite project (src/CMakeLists.txt builds the
+#              SHARED library `aseprite` under ANDROID, M1.8)
 #
 # Other cache variables passed by Gradle: SKIA_DIR, GEN_EXE.
 

@@ -3,8 +3,8 @@ plugins {
 }
 
 // Native variant (ADR 0008 section 3): -PnativeTarget=probe|hello_laf|aseprite.
-// The default is `probe` until the `aseprite` variant links (M1.8).
-def nativeTarget = (project.findProperty('nativeTarget') ?: 'probe').toString()
+// The default is `aseprite` (the app itself, M1.8).
+def nativeTarget = (project.findProperty('nativeTarget') ?: 'aseprite').toString()
 if (!['probe', 'hello_laf', 'aseprite'].contains(nativeTarget)) {
     throw new GradleException("Unknown -PnativeTarget=${nativeTarget} (probe, hello_laf or aseprite)")
 }
@@ -71,12 +71,100 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // Aseprite's data/ is packaged as APK assets straight from the source
-    // tree (never copied by hand).
-    sourceSets {
-        main {
-            assets.srcDirs = ['../../data']
+    // Same as AGP's default (aapt2 ignoreAssetsPattern), spelled out because
+    // the GenerateDataAssets task below must apply exactly the same filter:
+    // data.manifest lists what is really packaged.
+    androidResources {
+        ignoreAssetsPattern = AssetsFilter.AAPT_PATTERN
+    }
+}
+
+// Aseprite's data/ (plus the files the desktop `copy_data` target adds,
+// src/CMakeLists.txt) is packaged as assets/data/ together with
+// assets/data.manifest (ADR 0002, ADR 0008 section 4). Generated, never
+// copied by hand.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def genAssets = tasks.register("generate${variant.name.capitalize()}DataAssets",
+                                       GenerateDataAssets) {
+            dataDir.set(file("${repoDir}/data"))
+            extraFiles.from(
+                ["README.md": "${repoDir}/README.md",
+                 "AUTHORS.md": "${repoDir}/AUTHORS.md",
+                 "EULA.txt": "${repoDir}/EULA.txt",
+                 "docs/LICENSES.md": "${repoDir}/docs/LICENSES.md"].values())
+            extraNames.set(["README.md", "AUTHORS.md", "EULA.txt", "docs/LICENSES.md"])
         }
+        variant.sources.assets.addGeneratedSourceDirectory(genAssets, GenerateDataAssets::getOutputDir)
+    }
+}
+
+// aapt2 --ignore-assets pattern (AGP default): "!" entries apply to files and
+// dirs, entries without it only to the given kind (<dir> = directories).
+class AssetsFilter {
+    static final String AAPT_PATTERN =
+        '!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~'
+
+    static boolean ignored(String name, boolean isDir) {
+        if (name.startsWith('.') || name.endsWith('~')) return true
+        if (isDir && name.startsWith('_')) return true
+        return ['cvs', 'thumbs.db', 'picasa.ini', '.ds_store'].contains(name.toLowerCase()) ||
+               name.toLowerCase().endsWith('.scc')
+    }
+}
+
+abstract class GenerateDataAssets extends DefaultTask {
+    @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract DirectoryProperty getDataDir()
+
+    @InputFiles
+    @PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract ConfigurableFileCollection getExtraFiles()
+
+    // Destination (relative to assets/data/) of each extra file, in the same
+    // order as extraFiles.
+    @Input
+    abstract ListProperty<String> getExtraNames()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void generate() {
+        def out = outputDir.get().asFile
+        project.delete(out)
+        def dataOut = new File(out, 'data')
+        dataOut.mkdirs()
+
+        // relative path -> source file
+        def files = new TreeMap<String, File>()
+        def root = dataDir.get().asFile
+        root.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+            def rel = root.toPath().relativize(f.toPath())
+            boolean skip = false
+            rel.eachWithIndex { part, i ->
+                if (AssetsFilter.ignored(part.toString(), i < rel.nameCount - 1))
+                    skip = true
+            }
+            if (!skip) files.put(rel.toString().replace('\\', '/'), f)
+        }
+        def extras = extraFiles.files.toList()
+        extraNames.get().eachWithIndex { name, i -> files.put(name, extras[i]) }
+
+        def md = java.security.MessageDigest.getInstance('SHA-256')
+        files.each { rel, src ->
+            def dst = new File(dataOut, rel)
+            dst.parentFile.mkdirs()
+            java.nio.file.Files.copy(src.toPath(), dst.toPath())
+            md.update("${rel}\u0000${src.length()}\u0000".getBytes('UTF-8'))
+            md.update(src.bytes)
+        }
+        def hash = md.digest().collect { String.format('%02x', it) }.join()
+        // Line 1: "sha256 <hash>"; then one relative path per line (file
+        // count = number of lines - 1).
+        new File(out, 'data.manifest').text =
+            "sha256 ${hash}\n" + files.keySet().join('\n') + '\n'
     }
 }
 

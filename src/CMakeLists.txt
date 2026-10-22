@@ -195,9 +195,20 @@ if(ENABLE_ASEPRITE_EXE)
     set(INSTALL_OPT BUNDLE)
   endif()
 
-  add_executable(aseprite ${BUNDLE_PARAM}
-    main/main.cpp
-    ${main_resources})
+  if(ANDROID)
+    # libaseprite.so loaded by the GameActivity app (android/). The entry
+    # point android_main() comes from laf-os (liblaf-os.a, it calls
+    # app_main() of main/main.cpp), the APK assets are extracted by the
+    # weak hook os::android_pre_main. The hook must be in an object of
+    # this target: a weak reference doesn't pull archive members.
+    add_library(aseprite SHARED
+      main/main.cpp
+      main/android_assets.cpp)
+  else()
+    add_executable(aseprite ${BUNDLE_PARAM}
+      main/main.cpp
+      ${main_resources})
+  endif()
   if(LAF_BACKEND STREQUAL "skia")
     if(WIN32)
       set_target_properties(aseprite PROPERTIES WIN32_EXECUTABLE true)
@@ -233,11 +244,13 @@ if(ENABLE_ASEPRITE_EXE)
       ${LAF_BACKEND_LINK_FLAGS})
   endif()
 
-  install(TARGETS aseprite
-    ${INSTALL_OPT} DESTINATION bin)
+  if(NOT ANDROID)
+    install(TARGETS aseprite
+      ${INSTALL_OPT} DESTINATION bin)
 
-  install(DIRECTORY ../data
-    DESTINATION share/aseprite)
+    install(DIRECTORY ../data
+      DESTINATION share/aseprite)
+  endif()
 endif()
 
 ######################################################################
