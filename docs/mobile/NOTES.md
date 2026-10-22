@@ -1022,3 +1022,20 @@ User feedback (→ M1.10):
    it as a colour bug.
 4. Launcher icon is the generic Android one — use Aseprite's icon from
    `data/icons/`.
+
+### M2.1/M2.2 + M1.10 on the device (2026-10-22)
+
+`0.0.4-m1-aseprite` with pen/finger input installed after an uninstall.
+Result: **the user draws with the pen — "всё отлично"**; menus/dialogs work
+by tap. Log: `safe area insets=(9 9 9 9) px, corner radii=(28 28 28 28) px
+from ro.config.fillet_radius_size` — the dp guess for the Huawei property
+gives a margin the user accepted (no complaint about clipping).
+
+- **Refresh rate: the panel drops to 60 Hz** while Aseprite runs
+  (`dumpsys display` active mode 60 Hz, SurfaceFlinger activeMode 60 fps).
+  The M0.5 stub held 120 Hz because it rendered continuously; Aseprite
+  renders on demand via CPU raster copies, so HarmonyOS's adaptive policy
+  picks 60. Fix: `ANativeWindow_setFrameRate()` (API 30+) / a preferred
+  display mode for 120–144 Hz, plus the GPU path (M1.6) — pulled forward
+  from M4.3.
+- User asks first for two-finger pinch zoom (M3.3).
