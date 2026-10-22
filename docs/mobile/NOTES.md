@@ -395,24 +395,64 @@ Surprises, no action needed or deferred:
 First `app-lib` attempt (`cmake --build build/android --target app-lib`,
 not fixed, input for M1): stops early on two classes of errors.
 
-1. **`gen` is a build-time code generator and is built for the target.**
+1. **`gen` is a build-time code generator and was built for the target.**
    Every `*.xml.h`, `pref.xml.cpp`, `command_ids.ini.h`,
-   `check-translations.txt` rule runs `build/android/bin/gen`, an
-   aarch64-android executable; the host tries to run it through
-   `qemu-aarch64-static` and fails with `Could not open
-   '/system/bin/linker64'` (66 of 68 failed steps). Needs a host-built `gen`
-   (e.g. `ExternalProject_Add` of the root project with host compiler and
-   `-DENABLE_...=OFF`, or a host tool build tree) and `src/app/CMakeLists.txt`
-   (~line 819, `add_custom_command` calls using `$<TARGET_FILE:gen>`) pointing
-   to it when `CMAKE_CROSSCOMPILING`. Everything else in `app-lib` is blocked
-   behind these headers, so further error classes are not known yet.
+   `check-translations.txt` rule (`src/app/CMakeLists.txt:13-87`, collected
+   by `generate_files` at `:92`) runs `${GEN_EXE}`; with the target-built
+   aarch64 binary the host tried `qemu-aarch64-static` and failed with
+   `Could not open '/system/bin/linker64'` (66 of 68 failed steps). Fixed in
+   M1.1, see the next section.
 2. `src/updater/user_agent.cpp:57-60`: `base::Platform` has no `distroName` /
    `distroVer` because `laf/base/platform_unix.cpp` is not built on Android
    (M0.3 decision) and `platform.h` declares those members only for
    `LAF_LINUX`. `updater-lib` is built even with `ENABLE_UPDATER=OFF`
    (`src/CMakeLists.txt` adds it unconditionally) because `app-lib` links it
-   for `user_agent`. Fix options: expose the two fields on Android in
-   `laf/base/platform.h`, or guard the distro lines in `user_agent.cpp`.
+   for `user_agent`. Still open, M1.2 (guard in `user_agent.cpp`, see ROADMAP).
+
+### Host-built `gen` (M1.1, 2026-10-22)
+
+Branch `mobile/m1-host-gen` (from `mobile/m0-probe`), uncommitted. No CMake
+file was edited: `src/CMakeLists.txt:76-79` already imports `gen` when
+`GEN_EXE` is set, and `src/app/CMakeLists.txt` uses `${GEN_EXE}` /
+`${GEN_DEP}` (empty then) everywhere.
+
+- `android/scripts/build-host-gen.sh` configures the root project in
+  `build/host-tools` with host `gcc`/`g++` (override `HOST_CC`/`HOST_CXX`),
+  SDK cmake + ninja, `Release`, `LAF_BACKEND=none`, all optional features OFF,
+  and builds only `gen`. Output: `build/host-tools/bin/gen`
+  (`ELF 64-bit ... x86-64`). First run 62 s (46 ninja steps), re-run 2 s
+  ("no work to do"). It `unset`s `CMAKE_TOOLCHAIN_FILE/ANDROID_*` so nothing
+  from the Android environment leaks in.
+- `configure-android.sh` runs it first and passes `-DGEN_EXE=...`. The cache
+  entry shows as `GEN_EXE:UNINITIALIZED` (normal for `-D` without a type).
+- `build/android` was deleted and re-configured from scratch (42 s);
+  `cmake --build build/android --target generate_files` -> 67/67 steps OK,
+  `build/android/src/app/pref.xml.h` exists, `qemu`/`linker64` count in the
+  log: 0. The host root configure (gcc, `LAF_BACKEND=none`, updater/news OFF,
+  tests OFF) still configures (`/tmp` tree, 118 s).
+- `cmake --build build/android --target app-lib -- -k 0`: 1048 ninja steps,
+  3m47s wall, 1047 succeed. `qemu`/`linker64` count 0. Every `app-lib` object
+  compiles for Android, including `app.cpp`, `file_selector.cpp`,
+  `app_os_object.cpp`, `state_with_wheel_behavior.cpp`, `ui/window.cpp`,
+  `pref/preferences.cpp` (the sites listed in ROADMAP M1.2 are runtime
+  `#if` decisions, not compile errors).
+
+Remaining `app-lib` compile errors for M1.2, one class, 4 diagnostics, one
+file (`updater-lib`, which `app-lib` needs; `libapp-lib.a` and everything
+downstream are not produced until it compiles):
+
+| Class | First example | Count |
+|-------|---------------|-------|
+| `base::Platform` has no `distroName`/`distroVer` on non-`LAF_LINUX` | `src/updater/user_agent.cpp:57` (also `:58`, `:59`, `:60`) | 4 errors in 1 file |
+
+Warnings (not errors, 19): json11 `-Wunqualified-std-cast-call` (8,
+`third_party/json11/json11.cpp:156` etc.), deprecated `draw_text` /
+`drawTextWithDelegate` (5: `src/ui/graphics.cpp:489`, `src/ui/entry.cpp:907`,
+`src/app/script/graphics_context.cpp:66,81`, `src/app/ui/skin/skin_theme.cpp:1530`),
+unused `srcMaskBitmap` (2: `src/app/util/new_image_from_mask.cpp:41,99`),
+unused private field `m_news` (`src/app/ui/home_view.h:97`). All upstream,
+none caused by Android. Link errors (undefined `os::` symbols etc.) cannot
+show up before `aseprite` is linked (M1.8).
 
 ### Gradle skeleton (M0.5, 2026-10-22)
 
