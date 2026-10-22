@@ -5,16 +5,18 @@ the decisions already made; do not re-open them without asking the user.
 
 ## Target
 
-- Device: Huawei MatePad 11.5S PaperMatte, global firmware, HarmonyOS 4.x.
+- Device: Huawei MatePad 11.5S PaperMatte (`SLG-W09`), global firmware,
+  HarmonyOS 4.3.0, Android API 31.
 - HarmonyOS 4.x runs Android APKs, so the target is a regular **Android APK,
   ABI `arm64-v8a`**. HarmonyOS NEXT (.hap / ArkTS) is out of scope.
-- Display: 11.5", ~2800×1840, 144 Hz, matte (PaperMatte) panel. Treat exact
-  numbers (DPI, Android API level reported by HarmonyOS, GPU model) as
-  unverified until the user reports `getprop` / `dumpsys` output from the
-  device. Ask the user for that output when it matters.
-- Stylus: Huawei M-Pencil. Needed in v1: **palm rejection** and **pen
-  gestures** (side button / double-tap → e.g. eraser toggle). Pressure and
-  tilt are not required in v1 but must not be blocked by the design.
+- Display: 11.5", 2800×1840 landscape, density 400, 30–144 Hz, matte
+  (PaperMatte) panel; GPU Maleoon 920A, OpenGL ES 3.2. These numbers are
+  **verified** on the device (2026-10-21); `docs/mobile/NOTES.md` §9 is the
+  reference for all device facts.
+- Stylus: Huawei **M-Pencil 3** — no side button; the only pen gesture is
+  **double-tap**. Needed in v1: **palm rejection** and pen double-tap →
+  e.g. eraser toggle. Pressure and tilt are not required in v1 but must not
+  be blocked by the design.
 
 ## Decisions
 
@@ -24,8 +26,9 @@ the decisions already made; do not re-open them without asking the user.
 | D2 | Rendering: laf `skia` backend, Skia GPU over **OpenGL ES via EGL** on an `ANativeWindow`. Vulkan and CPU raster are not the main path (CPU raster is allowed as a temporary bring-up fallback). |
 | D3 | laf changes live in **the user's own fork of `aseprite/laf`**: https://github.com/MaksimCharyev/laf (remotes in `laf/`: `origin` = fork, `upstream` = aseprite/laf). The `laf` submodule URL is switched to that fork. The Android backend goes in `laf/os/android/` next to `os/win`, `os/osx`, `os/x11`. |
 | D4 | Android glue: native code driven by a small Gradle project in `android/` at the repo root (GameActivity from AGDK preferred over plain NativeActivity for IME/text input; the architect may revise with an ADR). |
-| D5 | **No device access for agents.** Agents build the APK only. The user installs and tests by hand. Agents hand the user precise test checklists and the exact `adb logcat` filters/commands to run, and ask for the output back. |
+| D5 | **Device access is read-only.** The user connects the tablet over USB and agents may run read-only `adb` commands (`getprop`, `dumpsys`, `logcat`, `getevent -lt`, `wm size/density`). `adb logcat -c` clears the device log buffer, so it is run by the user, not by agents. Installing APKs, changing settings, pushing/deleting files on the device is done by the user by hand. Agents hand the user precise test checklists. |
 | D6 | Prompts in English; agents report to the user **in Russian**. Code, comments, commit messages in English, following upstream style. |
+| D7 | **Host toolchain is temporary.** Everything Android-related on the laptop lives under `~/Android` (`Sdk` with SDK, NDK, CMake, Ninja, platform-tools; `jdk-17`) and `~/deps` (Skia), plus the tool state dirs `~/.android`, `~/.gradle` and `~/.java/.userPrefs/google` (created by sdkmanager); see the "Uninstall" section of `docs/mobile/BUILDING.md`. The user wants it all removed when the port work is finished; keep `docs/mobile/BUILDING.md` up to date with an "Uninstall" section listing every path and env var added. Nothing system-wide, no sudo. |
 
 ## Legal constraint (EULA.txt)
 
