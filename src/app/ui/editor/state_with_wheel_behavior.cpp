@@ -282,10 +282,11 @@ void StateWithWheelBehavior::processWheelAction(Editor* editor,
       ToolPreferences::Brush& brush = Preferences::instance().tool(tool).brush;
 
       if (fromMouseWheel == FromMouseWheel::On) {
-#if LAF_WINDOWS || LAF_LINUX
+#if LAF_WINDOWS || LAF_LINUX || LAF_ANDROID
         // By default on macOS the mouse wheel is correct, up increase
         // brush size, and down decrease it. But on Windows and Linux
-        // it's inverted.
+        // it's inverted (Android: the laf backend must report wheel
+        // deltas with the Windows/Linux sign, up = negative).
         dz = -dz;
 #endif
 
