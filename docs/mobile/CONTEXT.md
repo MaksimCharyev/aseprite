@@ -40,7 +40,14 @@ only. Never add store publishing, public release CI, or upload APKs anywhere.
 
 - Main repo fork: https://github.com/MaksimCharyev/aseprite. Remotes:
   `origin` = fork (push here), `upstream` = aseprite/aseprite (pull only).
-  Same layout in `laf/`. Use HTTPS remotes; SSH is not set up on this host.
+  Same layout in `laf/` and in the nested `laf/clip` (fork
+  https://github.com/MaksimCharyev/clip). Use HTTPS remotes; SSH is not set
+  up on this host.
+- The user's forks are only for the user: upstream laf does not accept
+  AI-generated or AI-co-authored code (`laf/CONTRIBUTING.md`), so nothing
+  from this port is sent upstream. New files written for the port carry
+  `Copyright (C) 2026  Maksim Charyev`; existing upstream headers are left
+  as they are.
 
 - Submodules are not initialized in a fresh checkout
   (`git submodule update --init --recursive`). `laf/` is empty until then.

@@ -245,6 +245,76 @@ extra_cflags_cc = [ "-frtti" ]
 - Link set for laf (M0.3): libskia + skshaper + skunicode + skparagraph if
   needed, plus freetype/harfbuzz/expat/png/webp/jpeg/zlib `.a` files.
 
+### laf `LAF_ANDROID` build (M0.3, 2026-10-22)
+
+Work is on laf branch `mobile/laf-android` (from `500768c`), **uncommitted**.
+Build tree: `build/laf-android` (outside laf). Result: `laf-base laf-gfx
+laf-ft laf-text laf-os` (+ `clip`) build for `aarch64-none-linux-android29`
+with `LAF_BACKEND=skia`; compile lines have `-DLAF_ANDROID
+-DSK_BUILD_FOR_ANDROID` and no `SK_R32_SHIFT`. A throw-away shared library
+linking `laf-os laf-text laf-ft laf-gfx laf-base` with
+`-Wl,--no-undefined` links fine (`/tmp/lafprobe`, not kept), so the
+Skia link set in `FindSkia.cmake` is complete for what laf uses.
+
+Patches (file: what):
+
+- `base/CMakeLists.txt`: `ANDROID` branch before the Unix one defines
+  `LAF_ANDROID` (not `LAF_LINUX`), links `log`; `platform_unix.cpp` is not
+  built (it is the Linux distro parser and needs `<map>` that only
+  `platform.h` includes under `LAF_LINUX`). `platform.cpp` therefore returns
+  an empty `Platform` on Android; `Platform::os` is still `OS::Linux`
+  (no `OS::Android` yet, to avoid touching Aseprite callers).
+- `base/fs.cpp`, `base/process.cpp`: `LAF_LINUX || LAF_ANDROID` (case
+  sensitive paths, `/proc/<pid>/exe`, includes). Not touched on purpose:
+  `base/thread_tests.cpp`, `platform.h` (X/distro bits), `os/tablet_options.h`,
+  `os/system.h` (X11).
+- `base/log.cpp`: under `LAF_ANDROID` also `__android_log_write` with tag
+  `laf`; `LOGva()` got a `level` argument for the priority.
+  Capture with `adb logcat -s laf`.
+- `cmake/FindSkia.cmake`: `SKIA_ARCH=arm64` for `ANDROID`
+  (fatal error for other ABIs); `GLESv2` + `EGL`; `SK_BUILD_FOR_ANDROID`;
+  no `SK_R32_SHIFT=16`, no fontconfig; `--start-group` kept; extra static libs
+  `zlib` (Skia's), `expat`, `webp`, `jpeg`, plus `log`, `android`.
+- `os/CMakeLists.txt`: Android uses `os/none/system.cpp` + new
+  `os/android/event_queue.{h,cpp}` (a small mutex/condvar queue, because
+  `common/event_queue.cpp` needs an `EventQueueImpl` and `CommonSystem` uses
+  it); no X11 sources/libs; the Skia-backend OS sources (`os/skia/*`) are not
+  built on Android yet. `os/common/system.cpp` skips `makeSkia()` on Android
+  for the same reason. Whoever writes `os/android` must revert both.
+- `text/skia_font_mgr.cpp`: `SkFontMgr_New_Android(nullptr)`
+  (`include/ports/SkFontMgr_android.h`).
+- `dlgs/CMakeLists.txt`: no sources on Android; `FileDialog::make()` already
+  returns `nullptr` for unknown platforms.
+- `clip/CMakeLists.txt` (nested submodule `laf/clip`): Android uses
+  `clip_none.cpp`, otherwise it fails on `xcb/xcb.h`. Committed on branch
+  `mobile/android` of the user's clip fork
+  (https://github.com/MaksimCharyev/clip; `laf/.gitmodules` points there).
+  Push the clip commit **before** the laf commit that bumps it, otherwise a
+  fresh `git submodule update --init --recursive` fails on a missing commit.
+
+Gotchas:
+
+- The NDK toolchain sets `CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY`, so
+  `find_library(... PATH <skia dir>)` silently fails. `FindSkia.cmake`
+  switches it to `BOTH` on Android and restores it at the end of the file.
+- `FindSkia.cmake` downloads/builds its own zlib with `ExternalProject`
+  (host build, no toolchain) when `ZLIB_LIBRARIES` is unset. On Android the
+  NDK sysroot `libz` is used. FreeType inside `libskia.a` calls plain
+  `inflate*`, while Skia's `libzlib.a` is Chromium-prefixed (`Cr_z_*`,
+  needed by Skia's libpng), so **both** are needed.
+- `os/dnd.cpp` references `os::default_decode_png/jpg/...` (defined only in
+  `os/win/dnd.cpp`) when `CLIP_ENABLE_IMAGE`; with `--whole-archive` on
+  `laf-os` the link fails. Same on desktop Linux, only hidden by lazy
+  archive linking; do not use `--whole-archive` for `liblaf-os.a`.
+- NDK cmake prints `Compatibility with CMake < 3.10` deprecation warnings from
+  `android.toolchain.cmake` itself (NDK r26b, not our code).
+- Desktop FindSkia output for Linux was compared old vs new by the
+  reviewer (link libraries, options, definitions, includes): identical.
+- Not verified: desktop compile with the real Skia backend (no desktop Skia
+  on this host); desktop checked with `LAF_BACKEND=none`, tests ON,
+  `ctest` 34/34 passed (host gcc, SDK cmake 3.31.6 + ninja).
+- Linux/Android behaviour: runtime is not verified (no device run).
+
 ## 7. Integration points in the code (for all agents)
 
 | Concern | Where |

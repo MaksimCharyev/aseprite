@@ -34,7 +34,7 @@ know how the device really reports pen/touch/keys.
 | M0.0 | Submodules initialized, laf remotes per D3 | architect | `git submodule status` has no `-` prefix | **done** (2026-10-21, laf `500768c`) |
 | M0.1 | Host toolchain | build-engineer | see below | **done** (2026-10-21) |
 | M0.2 | Skia m124 for Android | build-engineer | see below | **done** (2026-10-21) |
-| M0.3 | `LAF_ANDROID` platform in laf CMake + base | build-engineer | see below | todo |
+| M0.3 | `LAF_ANDROID` platform in laf CMake + base | build-engineer | see below | **done** (2026-10-22), laf branch `mobile/laf-android` + clip branch `mobile/android` (both forks) |
 | M0.4 | Cross-build non-GUI libs | build-engineer | see below | todo |
 | M0.5 | Gradle skeleton + GameActivity "hello" APK | build-engineer | see below | todo |
 | M0.6 | Input probe APK | touch-ux | see below | todo |
