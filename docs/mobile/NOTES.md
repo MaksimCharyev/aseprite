@@ -156,6 +156,33 @@ active or recently active), always drop `TOOL_TYPE_PALM`, cancel stroke on
 the pen; then touch with one finger, two fingers; paste
 `adb logcat -v time -s AsepriteProbe:V`.
 
+### M0.6 probe APK (2026-10-22, read from the GameActivity 4.4.2 jar/headers)
+
+- **GameActivity reports only `AXIS_X`/`AXIS_Y` by default.** Every other
+  axis (pressure, size, touch/tool major/minor, orientation, tilt,
+  distance) reads as 0 unless enabled with
+  `GameActivityPointerAxes_enableAxis()` (global, call once before input
+  arrives; `GameActivityEvents.h`). The laf backend (M2.1) must do this.
+  The probe enables all 48 axes and logs unknown non-zero ones as `other:`.
+- Motion and key filters are replaced with lambdas returning `true`
+  (`android_app_set_motion_event_filter` / `_key_event_filter`). With all
+  keys accepted, `onKeyDownNative` consumes Back and volume keys.
+- Hover path: GameActivity installs only `OnTouchListener`,
+  `OnGenericMotionListener` and `OnCapturedPointerListener` on its
+  `SurfaceView` (all call `processMotionEvent`). `ACTION_HOVER_*` is
+  dispatched through `View.dispatchHoverEvent()` first and reaches the
+  generic listener only by falling through (the `SurfaceView` is not
+  hoverable). `AsepriteActivity` installs an `OnHoverListener` that calls
+  `processMotionEvent()` and returns `true` (so each hover event is sent once).
+  Keep this in the real activity.
+- `AsepriteActivity.dispatchKeyEvent` logs every `KeyEvent` reaching the
+  activity (Java side, same tag, prefix `java key`), before GameActivity
+  forwards it; this tells whether the pen double-tap reaches the app at all.
+- `APP_CMD_KEY_EVENT` (19) / `APP_CMD_TOUCH_EVENT` (20) are only wake-ups
+  for the glue loop (the "APP_CMD 20" seen in M0.5).
+- Startup also logs every `InputDevice` (`getDeviceIds()`): name, sources,
+  vendor/product, `hasKeys(718)`, motion ranges.
+
 ## 5. GameActivity vs NativeActivity
 
 Status: **documented.** Decision in ADR 0001 (GameActivity).
@@ -539,3 +566,53 @@ Result: **passed** — solid colour full-screen, no crash.
   never rely on a clean exit (M2.5).
 - Touch input reaches the native side (`APP_CMD 20` + motion events,
   currently ignored by the stub).
+
+### M0.6 input probe on the device (2026-10-22)
+
+Probe APK `0.0.2-m0-probe` installed by the user; logcat
+(`AsepriteProbe`, ~6500 lines) read by the main session. The user did not
+follow the step order exactly, so steps were identified from the events.
+
+**Pen double-tap — confirmed.**
+- Arrives at the Activity (`dispatchKeyEvent`) **and** in native code
+  (GameActivity key filter accepting all keys) as **`keyCode=718`,
+  `scanCode=190`**, `source=KEYBOARD`, `flags=FROM_SYSTEM`,
+  `metaState=0x200000`, device **"HUAWEI M-Pencil 3 Mouse"** (id 126,
+  vendor 0x12d1 product 0x10a5). The separate evdev node "M-Pencil 3
+  Keyboard" from §9 is merged into that Android device.
+- 11 double-taps captured (hovering and away from the screen — both
+  work), **each = 2× DOWN/UP pairs 6–16 ms apart**. Debounce rule from
+  ADR 0006 (pairs within ~100 ms = one gesture) is confirmed.
+- System setting (read-only, `settings list secure`): `Double_Touch_index=0`,
+  `Double_Touch_Keycode=131`; the system did not consume the gesture with
+  this setting while the app was focused.
+
+**Stylus (device 5 "huawei,ts_pen", source 0x5002).**
+- `tool=STYLUS` only; no `TOOL_TYPE_ERASER` (M-Pencil 3 has no eraser end).
+- **Hover works**: `HOVER_ENTER / HOVER_MOVE / HOVER_EXIT` reach native code
+  (Java `OnHoverListener` path from the probe). `AXIS_DISTANCE` is always 0
+  — only in-range/out-of-range is known, not the height.
+- `pressure` 0..0.857 (continuous), `tilt` 0..1.18 rad, `orientation`
+  −1.6..1.4 rad — all live once the axes are enabled with
+  `GameActivityPointerAxes_enableAxis()` (they are 0 by default, M2.1 must
+  enable PRESSURE/TILT/ORIENTATION). `buttonState` always 0.
+
+**Fingers and palm (device 4 "input_mt_wrapper").**
+- Palm is reported as **several `tool=FINGER` pointers** (5–8 at once), with
+  larger `touchMajor` (up to ~48 vs ≤ ~23 for fingertips) and higher
+  `pressure` (up to ~15 vs ≤ ~7). **No `TOOL_TYPE_PALM`**, no
+  `FLAG_CANCELED` (API 31).
+- HarmonyOS's own palm rejection then sends **`ACTION_CANCEL` for the whole
+  finger stream** (6 times; 0.1–2 s after the palm lands). So the app must
+  treat `ACTION_CANCEL` as "discard the current finger gesture/stroke",
+  exactly as ADR 0006 §5 says.
+- Re-test (11:47, palm resting, then drawing): after the palm's
+  `ACTION_CANCEL` the system **swallows the resting palm completely** — no
+  finger events at all while the pen draws (stylus DOWN/MOVE/UP and hover
+  keep arriving normally). So HarmonyOS already does palm rejection at the
+  system level; the app only has to (1) discard the finger gesture/stroke
+  on `ACTION_CANCEL` and (2) ignore fingers while the pen is in range
+  (covers the 0.1–2 s before the system's CANCEL).
+- One-, two-, three-finger taps and pinch arrive as expected
+  (`POINTER_DOWN/UP`, up to 8 pointers during palm contact).
+- Hardware keyboard: "HUAWEI Magnetic Keyboard" (id 125) is also visible.

@@ -37,7 +37,7 @@ know how the device really reports pen/touch/keys.
 | M0.3 | `LAF_ANDROID` platform in laf CMake + base | build-engineer | see below | **done** (2026-10-22), laf branch `mobile/laf-android` + clip branch `mobile/android` (both forks) |
 | M0.4 | Cross-build non-GUI libs | build-engineer | see below | **done** (2026-10-22), branch `mobile/m0-libs`, uncommitted; see NOTES section 6 |
 | M0.5 | Gradle skeleton + GameActivity "hello" APK | build-engineer | see below | **done** (2026-10-22), branch `mobile/m0-gradle`; passed on the tablet (NOTES §9, "M0.5 on the device") |
-| M0.6 | Input probe APK | touch-ux | see below | todo |
+| M0.6 | Input probe APK | touch-ux | see below | **done** (2026-10-22): double-tap = keyCode 718 confirmed, hover OK, palm = FINGER + ACTION_CANCEL (NOTES §9 "M0.6"); palm while drawing re-tested OK (system swallows the palm after CANCEL) |
 | M0.7 | M0 review + device info checklist | reviewer | see below | todo |
 
 **M0.1 Host toolchain.** Install, user-local without sudo where possible,
