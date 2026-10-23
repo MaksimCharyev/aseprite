@@ -14,6 +14,8 @@ repo="$(cd "$here/../.." && pwd)"
 source "$here/env.sh"
 
 variant="${1:-aseprite}"
+# Translations must exist when Gradle configures the asset task.
+"$repo/android/scripts/fetch-strings.sh"
 "$repo/android/gradlew" -p "$repo/android" :app:assembleDebug "-PnativeTarget=$variant"
 mkdir -p "$repo/build/apk"
 cp "$repo/android/app/build/outputs/apk/debug/app-debug.apk" "$repo/build/apk/aseprite-$variant.apk"

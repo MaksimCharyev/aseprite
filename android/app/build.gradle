@@ -94,6 +94,24 @@ androidComponents {
                  "EULA.txt": "${repoDir}/EULA.txt",
                  "docs/LICENSES.md": "${repoDir}/docs/LICENSES.md"].values())
             extraNames.set(["README.md", "AUTHORS.md", "EULA.txt", "docs/LICENSES.md"])
+
+            // Translations from build/strings (android/scripts/fetch-strings.sh),
+            // packaged where Aseprite looks for them (data/strings.git/).
+            // -PstringsLanguages=ru,de,... selects them (default: ru).
+            def langs = (project.findProperty('stringsLanguages') ?: 'ru').toString()
+                .split(',')*.trim().findAll { it }
+            def stringsDir = file("${repoDir}/build/strings")
+            if (!langs.isEmpty() && stringsDir.isDirectory()) {
+                def names = []
+                (langs.collect { "${it}.ini" } + ['LICENSE.txt']).each { n ->
+                    def f = new File(stringsDir, n)
+                    if (f.isFile()) {
+                        extraFiles.from(f)
+                        names << "strings.git/${n}"
+                    }
+                }
+                extraNames.addAll(names)
+            }
         }
         variant.sources.assets.addGeneratedSourceDirectory(genAssets, GenerateDataAssets::getOutputDir)
     }
@@ -180,6 +198,12 @@ dependencies {
 // The generated sources of Aseprite are produced by `gen`, which runs on the
 // build machine: build it for the host first (ADR 0008 section 1). Only the
 // aseprite variant needs it (probe and hello_laf don't generate anything).
+// Translations (CC BY 4.0) fetched at a pinned commit into build/strings.
+tasks.register('fetchStrings', Exec) {
+    commandLine "${repoDir}/android/scripts/fetch-strings.sh"
+}
+tasks.named('preBuild') { dependsOn 'fetchStrings' }
+
 tasks.register('buildHostGen', Exec) {
     commandLine "${repoDir}/android/scripts/build-host-gen.sh"
 }
