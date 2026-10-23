@@ -969,6 +969,31 @@ tablet. Design of the file part: ADR 0009.
   later event is dropped (lost UP). Right Alt is `kKeyAlt` (not AltGr,
   which Aseprite treats as Ctrl+Alt). Verbose log per key:
   `input: key DOWN keyCode=… scanCode=… meta=0x… repeat=… unicode=0x… device=… source=0x… -> KeyDown scancode=… unicode=0x… modifiers=0x…`.
+- **IME re-injection of hardware keys** (device fact, Huawei MatePad +
+  Magnetic Keyboard, found 2026-10-23, fix on branch `mobile/m3-keyfix`,
+  laf `mobile/laf-keyfix`). While an input connection exists the Huawei
+  IME handles the physical keyboard and re-injects every key, so each
+  press reaches native code **twice**, ~8–15 ms apart, in either order:
+  from the keyboard (`device=131`, real `scanCode`, `meta=0x200000`,
+  `source=0x101`) and from the IME (`device=-1` =
+  `KeyCharacterMap.VIRTUAL_KEYBOARD`, `scanCode=0`, `meta=0x0`, `source`
+  `0x101` or `0x0`). Sometimes only the IME copy arrives (early in the
+  session, letters), so device -1 can't simply be dropped. Hardware
+  auto-repeat comes from `device=131` with `repeat=1,2,…` every ~50 ms.
+  Without the fix `ui::Entry` typed "aabbcc" and Backspace/Space twice;
+  the soft keyboard text path is not involved. `KeyInputAndroid` now
+  drops an event if one with the same action, keyCode and repeat class
+  (first DOWN / auto-repeat DOWN / UP) from a **different** `deviceId`
+  was accepted within 60 ms (`kDuplicateWindowNs`, compared with
+  `GameActivityKeyEvent::eventTime` in ns); the first copy wins, so no
+  latency is added. Same-device events (auto-repeat, quick presses) are
+  never dropped. The UP from the device whose DOWN was dropped is dropped
+  if the key was already released, otherwise accepted (no stuck keys) and
+  the other UP is then the duplicate. Verbose log per dropped event
+  (instead of the `input: key …` line):
+  `input: duplicate key from device -1 dropped (IME re-injection) DOWN keyCode=67 scanCode=0 repeat=0`.
+  Host tests: `AndroidKeys.Duplicate*`, `OnlyImeCopy`,
+  `QuickPressesSameDevice`, `OtherDeviceAfterWindow`, `DroppedDownLateUp`.
 - **Soft keyboard** (`os/android/text_input.{h,cpp}`, host test
   `text_input_tests`). `System::setTextInput(true)` →
   `GameActivity_setTextInputState("")` + `GameActivity_showSoftInput()`;

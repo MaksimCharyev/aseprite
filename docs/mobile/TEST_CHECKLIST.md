@@ -424,3 +424,30 @@ Capture:
 10. **Errors.** If an export fails, the console shows
    `Cannot save "<name>" to Download/Aseprite/: …`; paste the logcat
    `downloads: cannot publish …` lines and the Java stack trace.
+
+## Magnetic Keyboard: no doubled characters (branch mobile/m3-keyfix, laf mobile/laf-keyfix)
+
+Install `build/apk/aseprite-aseprite.apk` with `adb install -r`, enable
+verbose logs (`adb shell setprop debug.laf.verbose 1`, restart the app)
+and capture:
+
+    adb logcat -v time -s laf:V
+
+1. **Typing in a field.** Magnetic Keyboard attached. Sprite >
+   Properties (or File > Export As name field): type `hello world`.
+   Expected: exactly `hello world` (not `hheelllloo`), one space. For
+   each key logcat shows one `input: key DOWN keyCode=… -> KeyDown …`
+   line and, when the IME re-injects it, one
+   `input: duplicate key from device -1 dropped (IME re-injection) DOWN keyCode=…`
+   (or `from device 131` if the IME copy came first).
+2. **Backspace.** Press Backspace once: one character deleted. Hold it:
+   characters are deleted continuously at the normal repeat rate (not
+   twice as fast, not stopping after the first one); logcat has
+   `repeat=1,2,3,…` KeyDown lines.
+3. **Same key fast.** Type `aaaa` quickly: four `a`. Type `book`: the
+   double `o` stays.
+4. **Shortcuts still work.** Close the dialog: `B`, `E`, Ctrl+Z,
+   Ctrl+Shift+Z, hold Space + drag each act once (one undo step per
+   Ctrl+Z). After releasing all keys nothing stays pressed (drawing
+   without Space does not pan, Shift+click is not a line).
+
